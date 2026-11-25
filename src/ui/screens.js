@@ -5,6 +5,7 @@ import { audio } from "../core/audio.js";
 import { AI_PLAYSTYLES } from "../game/ai.js";
 import { Tournament, getCurrentTournament, clearTournament } from "../game/tournament.js";
 import { QUALITY_ORDER, QUALITY_PRESETS, autoQuality } from "../core/quality.js";
+import { Multiplayer, WebSocketTransport } from "../core/net.js";
 import { ARENAS } from "../data/arenas.js";
 import { VEHICLES } from "../data/vehicles.js";
 import { PAINTS, WHEELS, BOOSTS, BANNERS, TITLES } from "../data/cosmetics.js";
@@ -81,6 +82,7 @@ export function menu(game) {
     { label: "Profile", sub: "Stats & awards", go: "profile" },
     { label: "Replays", sub: "Saved matches", go: "replays" },
     { label: "Tournaments", sub: "Bracket cup", go: "tournaments" },
+    { label: "Online", sub: "Multiplayer status", go: "online" },
     { label: "Settings", sub: "Audio, controls, more", go: "settings" },
   ];
   for (const t of tiles) {
@@ -684,6 +686,60 @@ export function tournaments(game) {
   };
   render();
   return { name: "tournaments", destroy() {} };
+}
+
+// ---------------- ONLINE ----------------
+// Honest online status screen. Real online play requires a deployed backend
+// (WebSocket relay + authoritative server, see DEPLOY.md). Without a backend
+// the controller reports offline and the player is directed to local/AI play.
+// The Multiplayer architecture (matchmaking + transport) is implemented and
+// tested, but is NOT presented as working online play until a backend connects.
+export function online(game) {
+  const { content } = shell(game, { title: "ONLINE" });
+  // backend URL would be injected at deploy time (config.deploy.json, gitignored)
+  const backendUrl = (typeof window !== "undefined" && window.__NOVA_BACKEND_URL) || null;
+  const mp = new Multiplayer({ transport: new WebSocketTransport(backendUrl), mmr: profile.data.mmr["1v1"] || 0 });
+
+  const render = () => {
+    clear(content);
+    const s = mp.status();
+    const online = mp.online;
+
+    content.append(el("div", { class: "section-title", text: "Online Play" }));
+    const statusCard = el("div", { class: "card" + (online ? " is-selected" : "") });
+    statusCard.append(
+      el("div", { class: "card__title", text: online ? "Connected to server" : "Offline — no backend" }),
+      el("div", { class: "card__sub", text: online ? "Matchmaking is available." : "Online multiplayer requires a deployed backend. Local play vs AI and Local 2P are fully available." })
+    );
+    content.append(statusCard);
+
+    content.append(el("div", { class: "section-title mt-5", text: "STATUS" }));
+    const info = el("div", { class: "card" });
+    info.append(el("div", { class: "card__sub", text: "State: " + s.state }));
+    info.append(el("div", { class: "card__sub", text: "Connection: " + (online ? "connected" : "not connected") }));
+    info.append(el("div", { class: "card__sub", text: "Matchmaking queue: " + s.queueSize }));
+    if (s.estimateWait != null) info.append(el("div", { class: "card__sub", text: "Estimated wait: " + Math.round(s.estimateWait / 1000) + "s" }));
+    content.append(info);
+
+    content.append(el("div", { class: "section-title mt-5", text: "PLAY" }));
+    if (online) {
+      const searchBtn = el("button", { class: "btn btn--primary btn--lg", text: "SEARCH 1v1", onclick: () => {
+        const r = mp.startSearch("1v1");
+        if (!r.ok) { toast("Could not start search: " + (r.reason || "error"), "info"); return; }
+        toast("Searching for an opponent…", "info");
+        render();
+      } });
+      content.append(el("div", { class: "row", style: { justifyContent: "center" } }, [searchBtn]));
+    } else {
+      content.append(el("div", { class: "text-dim mt-4", text: "No backend is configured in this build, so online matchmaking cannot run. The networking architecture is implemented and tested; deploy the backend (see DEPLOY.md) to enable real online play." }));
+      content.append(el("div", { class: "row mt-4", style: { justifyContent: "center" } }, [
+        el("button", { class: "btn btn--primary", text: "Play vs AI", onclick: () => { audio.ui(880); game.router.go("play"); } }),
+        el("button", { class: "btn", text: "Local 2P", onclick: () => { audio.ui(880); game.startMatch({ mode: "local2p", arena: ARENAS[0].id, difficulty: "medium" }); } }),
+      ]));
+    }
+  };
+  render();
+  return { name: "online", destroy() {} };
 }
 
 function renderBracket(p) {

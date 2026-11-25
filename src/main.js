@@ -49,6 +49,7 @@ async function boot() {
     stats: () => Screens.statsScreen(game),
     replays: () => Screens.replays(game),
     tournaments: () => Screens.tournaments(game),
+    online: () => Screens.online(game),
   }, "menu");
   game.router = router;
 
