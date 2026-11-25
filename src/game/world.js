@@ -36,7 +36,7 @@ export class World {
       v.controlScheme = p.control || "p1";
       v.profileId = p.profileId || null;
       this.vehicles.push(v);
-      if (!p.isPlayer) this.ais.push(new AICar(v, p.difficulty || "medium"));
+      if (!p.isPlayer) this.ais.push(new AICar(v, p.difficulty || "medium", p.style || "balanced"));
     });
 
     this.match = new Match({ mode: config.mode, arena: this.arena, ball: this.ball, vehicles: this.vehicles });
@@ -132,6 +132,8 @@ export class World {
 
     for (const v of this.vehicles) v.collideBall(this.ball, env);
 
+    this._trackStats();
+
     // arena-specific collisions (hoops visuals handled in detect via match)
     this.match.update(dt, env, this.sfx);
     this._consumeEvents();
@@ -167,13 +169,41 @@ export class World {
     }
   }
 
+  // classify ball-car contact as shot / save / aerial touch for stat tracking
+  _trackStats() {
+    const b = this.ball;
+    if (!b.lastTouchId) return;
+    const v = this.vehicles.find((x) => x.id === b.lastTouchId);
+    if (!v) return;
+    const team = v.team;
+    // attack direction: blue attacks +x (right), orange attacks -x (left)
+    const attackSign = team === "blue" ? 1 : -1;
+    const sp = Math.hypot(b.vx, b.vy);
+    // a shot: ball leaves the car moving toward the opponent goal at speed
+    if (b.vx * attackSign > 480) {
+      this.match.stats[team].shots++;
+    }
+    // a save: the ball was arriving toward this team's own goal (opponent shot)
+    // and this car deflected it. Approx: ball now moving away from own goal or slowed.
+    const ownGoalSign = -attackSign;
+    if (b.vx * ownGoalSign < -300 && b.vx * attackSign > -100) {
+      this.match.stats[team].saves++;
+    }
+    // aerial touch (for player achievements/stats)
+    if (v.isPlayer && !v.onGround && v.airTime > 0.25 && b.lastTouch === team) {
+      this.match.stats[team].aerials = (this.match.stats[team].aerials || 0) + 1;
+    }
+  }
+
   _record() {
     if (!this.record) return;
     if (this.frames.length > 60 * 180) return; // cap ~3 min
     this.frames.push({
       t: this.match.time,
-      ball: { x: this.ball.x, y: this.ball.y, spin: this.ball.spin },
-      v: this.vehicles.map((v) => ({ x: v.x, y: v.y, a: v.angle, b: v.boost, t: v.team })),
+      state: this.match.state,
+      score: { blue: this.match.score.blue, orange: this.match.score.orange },
+      ball: { x: this.ball.x, y: this.ball.y, spin: this.ball.spin, vx: this.ball.vx, vy: this.ball.vy },
+      v: this.vehicles.map((v) => ({ x: v.x, y: v.y, a: v.angle, b: v.boost, t: v.team, name: v.name, flip: !!v.flipping })),
     });
   }
 
@@ -225,13 +255,8 @@ export class World {
     ctx.save();
     ctx.clearRect(0, 0, cw, ch);
 
-    // background
-    const bg = ctx.createLinearGradient(0, 0, 0, ch);
-    bg.addColorStop(0, A.bgAccent);
-    bg.addColorStop(0.6, A.bg);
-    bg.addColorStop(1, "#02030a");
-    ctx.fillStyle = bg;
-    ctx.fillRect(0, 0, cw, ch);
+    // background (variant-aware)
+    this._drawBackground(ctx, cw, ch, A);
 
     this._updateCamera(0.016);
     const s = this.cam.scale;
@@ -275,6 +300,52 @@ export class World {
     ctx.restore();
   }
 
+  _drawBackground(ctx, cw, ch, A) {
+    const variant = A.variant || "dome";
+    if (variant === "outdoor") {
+      const sky = ctx.createLinearGradient(0, 0, 0, ch);
+      sky.addColorStop(0, A.bgAccent);
+      sky.addColorStop(0.55, A.bg);
+      sky.addColorStop(1, "#02030a");
+      ctx.fillStyle = sky; ctx.fillRect(0, 0, cw, ch);
+      const sun = ctx.createRadialGradient(cw * 0.78, ch * 0.22, 4, cw * 0.78, ch * 0.22, ch * 0.4);
+      sun.addColorStop(0, A.crowd); sun.addColorStop(0.4, A.crowd + "66"); sun.addColorStop(1, A.crowd + "00");
+      ctx.fillStyle = sun; ctx.fillRect(0, 0, cw, ch);
+      const hz = ctx.createLinearGradient(0, ch * 0.6, 0, ch);
+      hz.addColorStop(0, A.bg + "00"); hz.addColorStop(1, A.ambient);
+      ctx.fillStyle = hz; ctx.fillRect(0, ch * 0.6, cw, ch * 0.4);
+    } else if (variant === "hall") {
+      const sky = ctx.createLinearGradient(0, 0, 0, ch);
+      sky.addColorStop(0, "#05050f"); sky.addColorStop(0.7, A.bg); sky.addColorStop(1, A.bgAccent);
+      ctx.fillStyle = sky; ctx.fillRect(0, 0, cw, ch);
+      ctx.save(); ctx.globalCompositeOperation = "lighter";
+      for (let i = 0; i < 4; i++) {
+        const bx = cw * (0.18 + i * 0.21);
+        const lg = ctx.createLinearGradient(bx, 0, bx, ch * 0.8);
+        lg.addColorStop(0, A.crowd + "33"); lg.addColorStop(1, A.crowd + "00");
+        ctx.fillStyle = lg;
+        ctx.beginPath();
+        ctx.moveTo(bx - 20, 0); ctx.lineTo(bx + 20, 0); ctx.lineTo(bx + 90, ch * 0.8); ctx.lineTo(bx - 90, ch * 0.8);
+        ctx.closePath(); ctx.fill();
+      }
+      ctx.restore();
+    } else if (variant === "garden") {
+      const sky = ctx.createLinearGradient(0, 0, 0, ch);
+      sky.addColorStop(0, A.bgAccent); sky.addColorStop(0.7, A.bg); sky.addColorStop(1, "#02030a");
+      ctx.fillStyle = sky; ctx.fillRect(0, 0, cw, ch);
+      const glow = ctx.createRadialGradient(cw * 0.5, ch * 0.3, 10, cw * 0.5, ch * 0.3, ch * 0.6);
+      glow.addColorStop(0, A.ambient + "55"); glow.addColorStop(1, A.ambient + "00");
+      ctx.fillStyle = glow; ctx.fillRect(0, 0, cw, ch);
+    } else {
+      const sky = ctx.createLinearGradient(0, 0, 0, ch);
+      sky.addColorStop(0, A.bgAccent); sky.addColorStop(0.6, A.bg); sky.addColorStop(1, "#02030a");
+      ctx.fillStyle = sky; ctx.fillRect(0, 0, cw, ch);
+      const vig = ctx.createRadialGradient(cw / 2, ch * 0.5, ch * 0.2, cw / 2, ch * 0.5, ch * 0.7);
+      vig.addColorStop(0, A.ambient + "33"); vig.addColorStop(1, A.ambient + "00");
+      ctx.fillStyle = vig; ctx.fillRect(0, 0, cw, ch);
+    }
+  }
+
   _drawCrowd(ctx, cw, ch, A) {
     ctx.save();
     ctx.globalAlpha = 0.5;
@@ -303,6 +374,24 @@ export class World {
     ctx.strokeStyle = A.floorEdge; ctx.lineWidth = 4 * s; ctx.shadowColor = A.floorEdge; ctx.shadowBlur = 18;
     ctx.beginPath(); ctx.moveTo(fl0.x, fl0.y); ctx.lineTo(fl1.x, fl1.y); ctx.stroke();
     ctx.shadowBlur = 0;
+
+    // variant-specific field markings
+    const variant = A.variant || "dome";
+    if (variant === "hall" || variant === "dome") {
+      const cc = W2S(A.W / 2, 0);
+      ctx.strokeStyle = "rgba(255,255,255,0.10)"; ctx.lineWidth = 2 * s;
+      ctx.beginPath(); ctx.ellipse(cc.x, cc.y, A.W * 0.12 * s, A.W * 0.12 * s * 0.28, 0, 0, Math.PI * 2); ctx.stroke();
+      for (const side of [0.16, 0.84]) {
+        const px = W2S(A.W * side, 0);
+        ctx.beginPath(); ctx.ellipse(px.x, px.y, A.W * 0.06 * s, A.W * 0.06 * s * 0.28, 0, 0, Math.PI); ctx.stroke();
+      }
+    } else if (variant === "garden") {
+      ctx.strokeStyle = "rgba(255,255,255,0.05)"; ctx.lineWidth = 2 * s;
+      for (let i = 1; i < 8; i++) {
+        const x = W2S(A.W * (i / 8), 0).x;
+        ctx.beginPath(); ctx.moveTo(x, W2S(0, 0).y); ctx.lineTo(x, W2S(0, A.H).y); ctx.stroke();
+      }
+    }
 
     // walls (left/right/ceiling)
     ctx.strokeStyle = A.wallEdge; ctx.lineWidth = 3 * s;
@@ -406,6 +495,35 @@ export class World {
     const accent = cos.paint2 || "#0c1020";
     const wheel = cos.wheelColor || "#23283a";
     const wheelAcc = cos.wheelAccent || body;
+    const boost = cos.boostColor || "#ffd24b";
+
+    // suspension squash: body sinks a touch under acceleration/braking, rebounds in air
+    const sp = v.speed;
+    const fwd = sp > 0.1 ? (v.vx * Math.cos(v.angle) + v.vy * Math.sin(v.angle)) / sp : 0;
+    const onG = v.onGround ? 1 : 0;
+    const sq = onG ? (1 - 0.16 * Math.max(-1, Math.min(1, fwd)) - 0.05) : 1.05;
+    const wheelSq = onG ? (1 + 0.22 * Math.max(-1, Math.min(1, fwd))) : 0.7;
+
+    // ---- ground shadow ----
+    if (onG) {
+      ctx.save();
+      ctx.globalAlpha = 0.28;
+      ctx.fillStyle = "#000";
+      ctx.beginPath();
+      ctx.ellipse(0, hh * 1.1, hw * 1.25, hh * 0.45, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    } else {
+      // airborne shadow shrinks as it rises
+      const air = Math.min(1, (v.y - 60) / 500);
+      ctx.save();
+      ctx.globalAlpha = 0.18 * (1 - air * 0.6);
+      ctx.fillStyle = "#000";
+      ctx.beginPath();
+      ctx.ellipse(0, hh * 1.1, hw * (1.1 - air * 0.3), hh * (0.45 - air * 0.2), 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
 
     // team ring (under)
     ctx.save();
@@ -414,46 +532,105 @@ export class World {
     ctx.beginPath(); ctx.ellipse(0, hh * 0.9, hw * 1.1, hh * 0.5, 0, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
 
-    // boost flame
+    // ---- boost flame ----
     if (v.boostActive) {
-      const fl = (8 + Math.random() * 10) * s;
+      const fl = (8 + Math.random() * 12) * s;
       const fg = ctx.createLinearGradient(-hw - fl, 0, -hw, 0);
       fg.addColorStop(0, "rgba(255,210,75,0)");
-      fg.addColorStop(1, cos.boostColor || "#ffd24b");
+      fg.addColorStop(0.6, "rgba(255,170,60,0.8)");
+      fg.addColorStop(1, boost);
       ctx.fillStyle = fg;
       ctx.beginPath();
       ctx.moveTo(-hw, -hh * 0.4);
       ctx.lineTo(-hw - fl, 0);
       ctx.lineTo(-hw, hh * 0.4);
       ctx.closePath(); ctx.fill();
+      // glow
+      ctx.save();
+      ctx.globalAlpha = 0.35;
+      ctx.fillStyle = boost;
+      ctx.beginPath();
+      ctx.ellipse(-hw - fl * 0.4, 0, fl * 0.6, hh * 0.6, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
     }
 
-    // chassis (rounded body)
+    // ---- chassis with shading ----
+    ctx.save();
+    ctx.scale(1, sq);
+    // base
     ctx.fillStyle = body;
     this._roundRect(ctx, -hw, -hh, hw * 2, hh * 2, hh * 0.7);
     ctx.fill();
+    // top highlight
+    ctx.save();
+    ctx.globalAlpha = 0.5;
+    const hi = ctx.createLinearGradient(0, -hh, 0, hh);
+    hi.addColorStop(0, "rgba(255,255,255,0.55)");
+    hi.addColorStop(0.5, "rgba(255,255,255,0.05)");
+    hi.addColorStop(1, "rgba(0,0,0,0.35)");
+    ctx.fillStyle = hi;
+    this._roundRect(ctx, -hw, -hh, hw * 2, hh * 2, hh * 0.7);
+    ctx.fill();
+    ctx.restore();
+    // body edge outline
+    ctx.strokeStyle = "rgba(0,0,0,0.35)";
+    ctx.lineWidth = 1.4 * s;
+    this._roundRect(ctx, -hw, -hh, hw * 2, hh * 2, hh * 0.7);
+    ctx.stroke();
+    ctx.restore();
 
-    // cabin / windshield
+    // ---- cabin / windshield ----
+    ctx.save();
+    ctx.scale(1, sq);
     ctx.fillStyle = accent;
     this._roundRect(ctx, -hw * 0.15, -hh * 0.1, hw * 0.7, hh * 1.2, hh * 0.4);
     ctx.fill();
-    ctx.fillStyle = "rgba(120,200,255,0.55)";
+    // glass sheen
+    ctx.fillStyle = "rgba(150,210,255,0.6)";
     this._roundRect(ctx, hw * 0.08, -hh * 0.02, hw * 0.42, hh * 0.9, hh * 0.3);
     ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,0.35)";
+    this._roundRect(ctx, hw * 0.1, -hh * 0.06, hw * 0.16, hh * 0.7, hh * 0.2);
+    ctx.fill();
+    ctx.restore();
 
-    // nose accent
+    // ---- nose accent ----
+    ctx.save();
+    ctx.scale(1, sq);
     ctx.fillStyle = accent;
     ctx.beginPath();
     ctx.moveTo(hw, -hh * 0.5); ctx.lineTo(hw + hw * 0.18, 0); ctx.lineTo(hw, hh * 0.5); ctx.closePath();
     ctx.fill();
+    ctx.restore();
 
-    // wheels
-    const wr = (cos.wheelRadius || 13) * 0.7;
+    // ---- wheels (rotating + suspension) ----
+    const wr = (cos.wheelRadius || 13) * 0.7 * wheelSq;
     for (const wx of [-hw * 0.55, hw * 0.55]) {
+      const wy = hh * 0.95;
+      // tire
       ctx.fillStyle = wheel;
-      ctx.beginPath(); ctx.arc(wx, hh * 0.95, wr, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(wx, wy, wr, 0, Math.PI * 2); ctx.fill();
+      // rim
       ctx.fillStyle = wheelAcc;
-      ctx.beginPath(); ctx.arc(wx, hh * 0.95, wr * 0.45, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(wx, wy, wr * 0.62, 0, Math.PI * 2); ctx.fill();
+      // rotating spokes
+      ctx.save();
+      ctx.translate(wx, wy);
+      ctx.rotate(v.wheelSpin);
+      ctx.strokeStyle = "rgba(0,0,0,0.5)";
+      ctx.lineWidth = 1.6 * s;
+      for (let i = 0; i < 4; i++) {
+        const a = (i / 4) * Math.PI * 2;
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(Math.cos(a) * wr * 0.58, Math.sin(a) * wr * 0.58);
+        ctx.stroke();
+      }
+      ctx.restore();
+      // hub
+      ctx.fillStyle = "rgba(255,255,255,0.25)";
+      ctx.beginPath(); ctx.arc(wx, wy, wr * 0.18, 0, Math.PI * 2); ctx.fill();
     }
 
     ctx.restore();

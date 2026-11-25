@@ -161,6 +161,10 @@ export class Vehicle {
     this.x += this.vx * dt;
     this.y += this.vy * dt;
     this.angle += this.angVel * dt;
+    // wheel spin follows forward speed (drives rotation + suspension squash)
+    const ax = Math.cos(this.angle);
+    const fwd = this.vx * ax + this.vy * Math.sin(this.angle);
+    this.wheelSpin += (fwd / Math.max(20, PHYS.MAX_DRIVE_SPEED)) * dt * 6;
     if (this.touchTimer > 0) this.touchTimer -= dt;
 
     // ----- WORLD CONTACT -----
@@ -268,6 +272,7 @@ export class Vehicle {
   reset(x, y, angle = 0) {
     this.x = x; this.y = y; this.vx = 0; this.vy = 0;
     this.angle = angle; this.angVel = 0;
+    this.wheelSpin = 0;
     this.onGround = false; this.canFlip = true; this.flipping = false;
     this.facing = 1; this.airTime = 0; this.touchTimer = 0;
   }

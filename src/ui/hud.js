@@ -17,7 +17,10 @@ export class Hud {
       <div class="hud__mode">${m.cfg.label}</div>
       <div class="hud__score">
         <div class="hud__team hud__team--blue" id="hud-blue">0</div>
-        <div class="hud__clock" id="hud-clock">${m.timeString()}</div>
+        <div class="hud__clockwrap">
+          <div class="hud__clock" id="hud-clock">${m.timeString()}</div>
+          <div class="hud__shotclock" id="hud-shotclock" style="display:none">SHOT ${Math.ceil(m._shotClock || 24)}</div>
+        </div>
         <div class="hud__team hud__team--orange" id="hud-orange">0</div>
       </div>
       <div class="hud__boostwrap">
@@ -30,6 +33,7 @@ export class Hud {
     this.blue = this.elem.querySelector("#hud-blue");
     this.orange = this.elem.querySelector("#hud-orange");
     this.clock = this.elem.querySelector("#hud-clock");
+    this.shotclock = this.elem.querySelector("#hud-shotclock");
     this.boost = this.elem.querySelector("#hud-boost");
     this.names = this.elem.querySelector("#hud-names");
     this.center = this.elem.querySelector("#hud-center");
@@ -48,6 +52,16 @@ export class Hud {
     this.blue.textContent = m.score.blue;
     this.orange.textContent = m.score.orange;
     this.clock.textContent = m.overtime ? "OT" : m.timeString();
+    // shot clock for hoops
+    if (this.shotclock) {
+      const hoops = m.cfg.mode === "hoops";
+      this.shotclock.style.display = hoops ? "block" : "none";
+      if (hoops) {
+        const sc = Math.max(0, Math.ceil(m._shotClock || 24));
+        this.shotclock.textContent = "SHOT " + sc;
+        this.shotclock.classList.toggle("hud__shotclock--low", sc <= 5);
+      }
+    }
     const me = world.vehicles.find((v) => v.isPlayer);
     if (me) this.boost.style.width = me.boost + "%";
     this._updateNames();

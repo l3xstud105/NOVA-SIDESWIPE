@@ -47,6 +47,8 @@ async function boot() {
     profile: () => Screens.profileScreen(game),
     settings: () => Screens.settings(game),
     stats: () => Screens.statsScreen(game),
+    replays: () => Screens.replays(game),
+    tournaments: () => Screens.tournaments(game),
   }, "menu");
   game.router = router;
 

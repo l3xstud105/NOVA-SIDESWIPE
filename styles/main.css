@@ -295,6 +295,9 @@ input[type=text]:focus, select:focus { border-color: var(--cyan); outline: none;
 .hud__team--blue { color: var(--cyan); }
 .hud__team--orange { color: var(--orange); }
 .hud__clock { font-size: 22px; letter-spacing: 0.1em; color: var(--text); min-width: 70px; text-align: center; }
+.hud__clockwrap { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.hud__shotclock { font-size: 11px; letter-spacing: 0.18em; color: var(--text-dim); min-width: 70px; text-align: center; }
+.hud__shotclock--low { color: #ff6b6b; font-weight: 800; animation: pulse 0.6s infinite; }
 .hud__mode { position: absolute; top: 22px; left: 22px; font-size: 12px; letter-spacing: 0.2em; color: var(--text-dim); text-transform: uppercase; }
 .hud__boostwrap { position: absolute; bottom: 22px; left: 22px; width: 220px; }
 .hud__boostlabel { font-size: 11px; letter-spacing: 0.2em; color: var(--cyan); margin-bottom: 5px; }
@@ -307,6 +310,7 @@ input[type=text]:focus, select:focus { border-color: var(--cyan); outline: none;
 @keyframes pop { from { transform: scale(1.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 .hud__goalflash { position: absolute; inset: 0; background: radial-gradient(circle at center, rgba(255,255,255,0.5), transparent 60%); animation: goalflash 1s var(--ease-out) both; }
 @keyframes goalflash { from { opacity: 1; } to { opacity: 0; } }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
 .hud__banner { font-size: clamp(28px, 6vw, 64px); font-weight: 800; letter-spacing: 0.06em; }
 
 /* ---------- Match results ---------- */
@@ -316,6 +320,7 @@ input[type=text]:focus, select:focus { border-color: var(--cyan); outline: none;
 .results__verdict--loss { color: var(--red); }
 .results__verdict--draw { color: var(--text); }
 .results__score { font-size: 56px; font-weight: 800; letter-spacing: 0.1em; }
+.results__mvp { font-size: 15px; font-weight: 700; letter-spacing: 0.08em; color: var(--gold); margin-top: 6px; text-align: center; }
 .results__stats { display: grid; grid-template-columns: repeat(3, minmax(140px, 1fr)); gap: 14px; width: min(640px, 92vw); }
 .results__stat { text-align: center; padding: 14px; }
 .results__stat b { display: block; font-size: 28px; font-family: var(--font-display); }
@@ -359,3 +364,37 @@ input[type=text]:focus, select:focus { border-color: var(--cyan); outline: none;
   .navtile { min-width: 110px; flex-basis: 44%; }
   .topbar { padding: 12px 16px; }
 }
+
+/* ---------- replay ---------- */
+.replay-hud { bottom: auto; top: 16px; left: 16px; right: 16px; gap: 10px; pointer-events: none; }
+.replay-hud__controls { pointer-events: auto; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; background: var(--bg-panel-solid); border: 1px solid var(--line-strong); border-radius: 12px; padding: 8px 12px; box-shadow: var(--shadow-card); }
+.replay-hud__controls .rp-btn { padding: 6px 12px; font-size: 13px; }
+.replay-hud__time { color: var(--text-dim); font-family: var(--font-mono); font-size: 12px; min-width: 96px; }
+.replay-hud__speed { background: var(--bg-elevated); color: var(--text); border: 1px solid var(--line-strong); border-radius: 8px; padding: 5px 8px; font-size: 12px; }
+.replay-hud__scrub { pointer-events: auto; position: absolute; left: 16px; right: 16px; bottom: 16px; height: 6px; background: var(--bg-elevated); border-radius: 99px; cursor: pointer; overflow: hidden; }
+.replay-hud__progress { height: 100%; background: linear-gradient(90deg, var(--cyan), var(--violet)); border-radius: 99px; width: 0; transition: width 0.1s linear; }
+
+.replay-card { display: flex; flex-direction: column; gap: 8px; }
+.replay-card__head { display: flex; justify-content: space-between; align-items: center; }
+.replay-card__verdict { font-size: 11px; font-weight: 800; letter-spacing: 0.08em; padding: 3px 10px; border-radius: 99px; }
+.replay-card__foot { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; }
+
+/* ---------- tournaments ---------- */
+.tourn-team { display: flex; flex-direction: column; align-items: center; gap: 2px; font-weight: 800; font-size: 15px; min-width: 90px; }
+.tourn-team span { font-size: 11px; font-weight: 500; color: var(--text-dim); letter-spacing: 0.1em; text-transform: uppercase; }
+.bracket { display: flex; gap: 26px; overflow-x: auto; padding: 10px 4px 20px; align-items: flex-start; }
+.bracket__round { display: flex; flex-direction: column; gap: 14px; min-width: 150px; }
+.bracket__roundlabel { font-size: 10px; letter-spacing: 0.2em; color: var(--text-dim); text-transform: uppercase; text-align: center; margin-bottom: 4px; }
+.bracket__match { display: flex; flex-direction: column; gap: 5px; padding: 8px; border-radius: 10px; background: rgba(255,255,255,0.025); border: 1px solid var(--line); }
+.bracket__team { font-size: 12px; font-weight: 700; padding: 5px 8px; border-radius: 7px; background: var(--bg-elevated); border-left: 3px solid var(--text-dim); }
+.bracket__team--me { background: rgba(44,227,255,0.12); border-left-width: 4px; }
+.bracket__team--empty { color: var(--text-dim); opacity: 0.5; justify-content: center; text-align: center; }
+.bracket__team.is-win { box-shadow: inset 0 0 0 1px rgba(75,255,157,0.4); }
+.bracket__result { font-size: 10px; color: var(--text-dim); text-align: center; letter-spacing: 0.05em; margin-top: 2px; }
+
+/* ---------- presets ---------- */
+.preset-name { flex: 1; min-width: 120px; }
+.preset-list { display: flex; flex-direction: column; gap: 8px; max-height: 320px; overflow-y: auto; }
+.preset-item { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 10px; background: var(--bg-elevated); border: 1px solid var(--line); }
+.preset-item__name { font-weight: 700; font-size: 14px; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+input.preset-name, .preset-item input[type="text"] { background: var(--bg-elevated); color: var(--text); border: 1px solid var(--line-strong); border-radius: 8px; padding: 7px 10px; font-size: 13px; }

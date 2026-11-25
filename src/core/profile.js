@@ -24,9 +24,11 @@ function defaultProfile() {
         boost: "standard", banner: "none", title: "rookie",
       },
     },
-    stats: { matches: 0, wins: 0, losses: 0, draws: 0, goals: 0, saves: 0, aerials: 0, flipResets: 0, playtime: 0 },
+    stats: { matches: 0, wins: 0, losses: 0, draws: 0, goals: 0, shots: 0, saves: 0, aerials: 0, flipResets: 0, playtime: 0 },
     achievements: {},
     challenges: { daily: { date: today(), done: {} }, weekly: { date: week(), done: {} } },
+    replays: [],
+    presets: [],
     settings: { graphics: "high", musicVol: 0.5, sfxVol: 0.9, masterVol: 0.8, reducedMotion: false, touchLayout: "default" },
   };
 }
@@ -71,6 +73,51 @@ export const profile = {
   achieve(id) {
     if (!this.data.achievements[id]) { this.data.achievements[id] = Date.now(); this.save(); return true; }
     return false;
+  },
+
+  // ---- replays (local) ----
+  saveReplay(entry) {
+    if (!this.data.replays) this.data.replays = [];
+    // keep last 12 replays, newest first
+    this.data.replays.unshift(entry);
+    if (this.data.replays.length > 12) this.data.replays.length = 12;
+    this.save();
+    return entry;
+  },
+  getReplays() { return this.data.replays || []; },
+  getReplay(id) { return this.data.replays.find((r) => r.id === id) || null; },
+  deleteReplay(id) {
+    this.data.replays = (this.data.replays || []).filter((r) => r.id !== id);
+    this.save();
+  },
+
+  // ---- vehicle presets ----
+  getPresets() { return this.data.presets || []; },
+  savePreset(name, equipped) {
+    if (!this.data.presets) this.data.presets = [];
+    const id = "preset_" + Date.now().toString(36);
+    const preset = { id, name: name || "Preset", equipped: { ...equipped }, created: Date.now() };
+    this.data.presets.unshift(preset);
+    this.save();
+    return preset;
+  },
+  updatePreset(id, name, equipped) {
+    const p = (this.data.presets || []).find((x) => x.id === id);
+    if (!p) return false;
+    if (name) p.name = name;
+    p.equipped = { ...equipped };
+    this.save();
+    return true;
+  },
+  deletePreset(id) {
+    this.data.presets = (this.data.presets || []).filter((x) => x.id !== id);
+    this.save();
+  },
+  loadPreset(id) {
+    const p = (this.data.presets || []).find((x) => x.id === id);
+    if (!p) return false;
+    for (const [slot, val] of Object.entries(p.equipped)) this.equip(slot, val);
+    return true;
   },
 
   // build the cosmetic bundle used by the game
