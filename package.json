@@ -5,7 +5,7 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "test": "node tests/physics.test.mjs && node tests/replay.test.mjs && node tests/progression.test.mjs && node tests/ai.test.mjs && node tests/modes.test.mjs && node tests/tournament.test.mjs && node tests/quality.test.mjs && node tests/ball.test.mjs && node tests/aerial.test.mjs",
+    "test": "node tests/physics.test.mjs && node tests/replay.test.mjs && node tests/progression.test.mjs && node tests/ai.test.mjs && node tests/modes.test.mjs && node tests/tournament.test.mjs && node tests/quality.test.mjs && node tests/ball.test.mjs && node tests/aerial.test.mjs && node tests/arenas.test.mjs",
     "test:physics": "node tests/physics.test.mjs",
     "test:replay": "node tests/replay.test.mjs",
     "test:progression": "node tests/progression.test.mjs",
@@ -15,6 +15,7 @@
     "test:quality": "node tests/quality.test.mjs",
     "test:ball": "node tests/ball.test.mjs",
     "test:aerial": "node tests/aerial.test.mjs",
+    "test:arenas": "node tests/arenas.test.mjs",
     "serve": "node tools/serve.js"
   },
   "keywords": ["game", "browser", "car-soccer", "canvas", "webgl", "sideswipe"],

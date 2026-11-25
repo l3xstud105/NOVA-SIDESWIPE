@@ -130,6 +130,20 @@ export const ARENAS = [
   },
 ];
 
+// Ambient dynamic effects per arena: rain, snow, sparks, embers, leaves,
+// motes, confetti, petals, or none. Drives the world's ambient particle layer.
+const EFFECTS = {
+  neon:     { type: "sparks",  density: 0.5, color: "#2ce3ff" },
+  lava:     { type: "embers",  density: 0.8, color: "#ff9a3c" },
+  orbital:  { type: "sparks",  density: 0.4, color: "#b14bff" },
+  verdant:  { type: "leaves",  density: 0.5, color: "#4bff9d" },
+  solar:    { type: "motes",   density: 0.5, color: "#ffe9a0" },
+  dusk:     { type: "embers",  density: 0.5, color: "#ffb86b" },
+  champion: { type: "confetti", density: 0.6, color: "#ffd24b" },
+  garden:   { type: "petals",  density: 0.5, color: "#7fffb0" },
+};
+
 export function getArena(id) {
-  return ARENAS.find((a) => a.id === id) || ARENAS[0];
+  const a = ARENAS.find((x) => x.id === id) || ARENAS[0];
+  return { ...a, effects: EFFECTS[a.id] || { type: "none", density: 0, color: a.crowd } };
 }

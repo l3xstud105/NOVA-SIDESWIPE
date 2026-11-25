@@ -54,12 +54,75 @@ export class World {
     // camera
     this.cam = { x: this.arena.W / 2, y: this.arena.H / 2, scale: 1, shake: 0, sx: 0, sy: 0 };
     this.particles = [];
+    this.ambient = [];
+    this._ambientTimer = 0;
+    this.time = 0;
     this._initRenderState();
+    this._seedAmbient();
   }
 
   _initRenderState() {
     // hoops/volleyball visuals handled in render based on match cfg
   }
+
+  // ---- ambient weather / environment particles ----
+  _seedAmbient() {
+    this.ambient.length = 0;
+    const e = this.arena.effects;
+    if (!e || e.type === "none") return;
+    const n = Math.round(60 * (e.density || 0.5) * (this.quality.particles || 1));
+    for (let i = 0; i < n; i++) this._spawnAmbient(true);
+  }
+
+  _spawnAmbient(initial = false) {
+    const A = this.arena;
+    const e = A.effects;
+    if (!e || e.type === "none") return;
+    const x = initial ? Math.random() * A.W : A.W + 20 + Math.random() * 80;
+    const y = initial ? Math.random() * A.H : Math.random() * A.H;
+    let vx = -20 - Math.random() * 30;      // drift left by default
+    let vy = 30 + Math.random() * 40;       // drift down
+    let size = 2 + Math.random() * 3;
+    let spin = (Math.random() - 0.5) * 4;
+    let gravity = 0;
+    switch (e.type) {
+      case "rain":   vx = -60 - Math.random() * 40; vy = 500 + Math.random() * 200; size = 1 + Math.random() * 2; break;
+      case "snow":   vx = -15 + Math.random() * 30; vy = 25 + Math.random() * 30; size = 2 + Math.random() * 3; spin = (Math.random() - 0.5) * 2; break;
+      case "sparks": vx = -40 - Math.random() * 50; vy = 20 + Math.random() * 40; gravity = 30; break;
+      case "embers": vx = -25 + Math.random() * 50; vy = -20 - Math.random() * 40; gravity = -10; break;
+      case "leaves": vx = -30 + Math.random() * 60; vy = 30 + Math.random() * 30; spin = (Math.random() - 0.5) * 6; gravity = 20; break;
+      case "motes":  vx = -10 + Math.random() * 20; vy = -10 + Math.random() * 20; size = 1.5 + Math.random() * 2.5; break;
+      case "confetti": vx = -40 - Math.random() * 60; vy = 40 + Math.random() * 40; spin = (Math.random() - 0.5) * 10; gravity = 60; size = 3 + Math.random() * 3; break;
+      case "petals": vx = -25 + Math.random() * 50; vy = 25 + Math.random() * 35; spin = (Math.random() - 0.5) * 5; gravity = 15; break;
+    }
+    this.ambient.push({ x, y, vx, vy, size, spin, gravity, color: e.color, life: 1, maxLife: 1 });
+  }
+
+  _updateAmbient(dt) {
+    const A = this.arena;
+    const e = A.effects;
+    if (!e || e.type === "none") return;
+    const ps = this.ambient;
+    for (let i = ps.length - 1; i >= 0; i--) {
+      const p = ps[i];
+      p.vy += p.gravity * dt;
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.spin += p.spin * dt;
+      // recycle when off-screen
+      if (p.x < -30 || p.y > A.H + 30 || p.y < -60) {
+        ps.splice(i, 1);
+        this._spawnAmbient(false);
+      }
+    }
+    // cap density by quality
+    const cap = Math.round(80 * (e.density || 0.5) * (this.quality.particles || 1));
+    if (ps.length < cap) {
+      this._ambientTimer -= dt;
+      if (this._ambientTimer <= 0) { this._spawnAmbient(false); this._ambientTimer = 0.08; }
+    }
+  }
+
 
   _emitter() {
     return {
@@ -76,6 +139,7 @@ export class World {
   // ---------------- simulation ----------------
   update(dt) {
     if (this.paused) return;
+    this.time += dt;
     const env = { gravity: this.arena.gravity, arena: this.arena };
 
     const active = this.match.isActive();
@@ -94,6 +158,7 @@ export class World {
       this._consumeEvents();
       this._updateCamera(dt);
       this._updateParticles(dt);
+      this._updateAmbient(dt);
       return;
     }
 
@@ -104,6 +169,7 @@ export class World {
       this._consumeEvents();
       this._updateCamera(dt);
       this._updateParticles(dt);
+      this._updateAmbient(dt);
       this._record();
       return;
     }
@@ -112,6 +178,7 @@ export class World {
       this.ball.update(dt, env, this.sfx);
       this._updateCamera(dt);
       this._updateParticles(dt);
+      this._updateAmbient(dt);
       return;
     }
 
@@ -142,6 +209,7 @@ export class World {
 
     this._updateCamera(dt);
     this._updateParticles(dt);
+    this._updateAmbient(dt);
     this._record();
   }
 
@@ -273,18 +341,26 @@ export class World {
     // crowd dots (parallax band)
     this._drawCrowd(ctx, cw, ch, A);
 
+    // ambient weather / environment particles (world-space, parallax)
+    this._drawAmbient(ctx, W2S, s);
+
     // arena floor/walls
     this._drawArena(ctx, W2S, s, A);
 
-    // boost pads
+    // boost pads (pulsing)
     for (const pad of this.pads) {
       const p = W2S(pad.x, pad.y);
-      const pr = pad.r * s;
+      const pulse = 0.8 + Math.sin(this.time * 4 + pad.x * 0.01) * 0.2;
+      const pr = pad.r * s * pulse;
       const g = ctx.createRadialGradient(p.x, p.y, 2, p.x, p.y, pr);
       g.addColorStop(0, "rgba(255,210,75,0.9)");
       g.addColorStop(1, "rgba(255,210,75,0)");
       ctx.fillStyle = g;
       ctx.beginPath(); ctx.arc(p.x, p.y, pr, 0, Math.PI * 2); ctx.fill();
+      // inner ring
+      ctx.strokeStyle = "rgba(255,210,75,0.5)";
+      ctx.lineWidth = 2 * s;
+      ctx.beginPath(); ctx.arc(p.x, p.y, pr * 0.6, 0, Math.PI * 2); ctx.stroke();
     }
 
     // ball
@@ -371,13 +447,38 @@ export class World {
     }
   }
 
+  _drawAmbient(ctx, W2S, s) {
+    const ps = this.ambient;
+    if (!ps.length) return;
+    ctx.save();
+    for (const p of ps) {
+      const sp = W2S(p.x, p.y);
+      ctx.save();
+      ctx.translate(sp.x, sp.y);
+      ctx.rotate(p.spin);
+      ctx.globalAlpha = 0.7;
+      ctx.fillStyle = p.color;
+      // rain = thin streaks; others = small dots/shapes
+      if (this.arena.effects && this.arena.effects.type === "rain") {
+        ctx.fillRect(-0.6 * s, -4 * s, 1.2 * s, 8 * s);
+      } else {
+        ctx.beginPath();
+        ctx.arc(0, 0, p.size * s * 0.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+    ctx.restore();
+  }
+
   _drawCrowd(ctx, cw, ch, A) {
     ctx.save();
-    ctx.globalAlpha = 0.5;
     const r = (i) => ((Math.sin(i * 12.9898) * 43758.5453) % 1 + 1) % 1;
     for (let i = 0; i < 90; i++) {
       const x = (i * 53.3) % cw;
-      const y = 40 + r(i) * 60;
+      const baseY = 40 + r(i) * 60;
+      // gentle sway so the crowd feels alive
+      const y = baseY + Math.sin(this.time * 2 + i * 0.7) * 3;
       ctx.fillStyle = i % 2 ? A.crowd : "#ffffff";
       ctx.globalAlpha = 0.15 + r(i + 5) * 0.3;
       ctx.fillRect(x, y, 3, 3);
