@@ -210,7 +210,44 @@ export function play(game) {
 // ---------------- TRAINING ----------------
 export function training(game) {
   const { content } = shell(game, { title: "TRAINING" });
-  content.append(el("div", { class: "card", html: `<div class="card__title">Free Play Arena</div><div class="card__sub">Practice driving, aerials, flips and shooting against a passive ball. Press <span class="kbd">R</span> to reset the ball, <span class="kbd">Esc</span> to pause.</div>` }));
+  content.append(el("div", { class: "card", html: `<div class="card__title">Free Play Arena</div><div class="card__sub">Practice driving, aerials, flips and shooting. Press <span class="kbd">R</span> to reset the ball, <span class="kbd">Esc</span> to pause. Optionally add training bots so you can practice against a moving opponent.</div>` }));
+
+  // sandbox controls
+  let opps = 0, arenaId = ARENAS[0].id, oppDiff = "medium";
+  const ctrl = el("div", { class: "card mt-4" });
+  ctrl.append(el("div", { class: "card__title", text: "Sandbox Setup" }));
+  const oppRow = el("div", { class: "field", style: { display: "flex", justifyContent: "space-between", alignItems: "center" } });
+  const oppLabel = el("span", { class: "text-dim", text: "Training bots" });
+  const oppBtn = el("button", { class: "btn btn--sm", text: "0 (solo)", onclick: () => {
+    opps = (opps + 1) % 3;
+    oppBtn.textContent = opps + " " + (opps === 0 ? "(solo)" : "bot");
+  } });
+  oppRow.append(oppLabel, oppBtn);
+  ctrl.append(oppRow);
+
+  const diffRow = el("div", { class: "field", style: { display: "flex", justifyContent: "space-between", alignItems: "center" } });
+  const diffLabel = el("span", { class: "text-dim", text: "Bot difficulty" });
+  const diffBtn = el("button", { class: "btn btn--sm", text: "medium", onclick: () => {
+    const seq = ["easy", "medium", "hard"];
+    oppDiff = seq[(seq.indexOf(oppDiff) + 1) % 3];
+    diffBtn.textContent = oppDiff;
+  } });
+  diffRow.append(diffLabel, diffBtn);
+  ctrl.append(diffRow);
+  content.append(ctrl);
+
+  // arena picker
+  const aGrid = el("div", { class: "grid grid--3 mt-4" });
+  ARENAS.forEach((a) => {
+    const b = el("button", { class: "card" + (a.id === arenaId ? " is-selected" : ""), style: { padding: "0.6rem", textAlign: "left" } }, [
+      el("div", { class: "card__title", text: a.name }),
+      el("div", { class: "card__sub", text: a.theme }),
+    ]);
+    b.onclick = () => { arenaId = a.id; aGrid.querySelectorAll(".card").forEach((c) => c.classList.remove("is-selected")); b.classList.add("is-selected"); };
+    aGrid.append(b);
+  });
+  content.append(el("div", { class: "section-title", text: "Arena" }), aGrid);
+
   const drills = [
     { name: "Ground Shots", sub: "Drive and flip into the ball" },
     { name: "Aerials", sub: "Jump + boost to meet high balls" },
@@ -220,7 +257,7 @@ export function training(game) {
   const grid = el("div", { class: "grid grid--2 mt-4" });
   for (const d of drills) grid.append(el("div", { class: "card" }, [el("div", { class: "card__title", text: d.name }), el("div", { class: "card__sub", text: d.sub })]));
   content.append(grid);
-  content.append(el("button", { class: "btn btn--primary btn--lg mt-5", text: "START FREE PLAY", onclick: () => { audio.ui(880); game.startMatch({ mode: "free", arena: ARENAS[0].id, difficulty: "medium" }); } }));
+  content.append(el("button", { class: "btn btn--primary btn--lg mt-5", text: "START FREE PLAY", onclick: () => { audio.ui(880); game.startMatch({ mode: "free", arena: arenaId, practiceOpps: opps, practiceDifficulty: oppDiff }); } }));
   return { name: "training", destroy() {} };
 }
 

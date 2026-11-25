@@ -148,6 +148,15 @@ export class Game {
       players.push({ team: "orange", isPlayer: true, name: "P2", def: lo.vehicleDef, cosmetics: lo.toVehicleCosmetics(), control: "p2" });
     } else if (mode === "free") {
       players.push({ team: "blue", isPlayer: true, name: profile.data.name, def: lo.vehicleDef, cosmetics: lo.toVehicleCosmetics(), control: "p1" });
+      // Practice sandbox: optionally spawn AI opponents (1 or 2) so you can
+      // train against a moving, predicting opponent. Off by default.
+      const oppCount = Math.max(0, Math.min(2, opts.practiceOpps | 0));
+      const pStyles = ["balanced", "aggressive", "defensive"];
+      const oppDefs = ["wraith", "comet", "titan"];
+      for (let i = 0; i < oppCount; i++) {
+        const team = i === 0 ? "orange" : "orange";
+        players.push({ team, isPlayer: false, name: "Training Bot " + (i + 1), def: getVehicle(oppDefs[i % oppDefs.length]), cosmetics: this._aiCos(i), control: "ai", difficulty: opts.practiceDifficulty || opts.difficulty || "medium", style: pStyles[i % pStyles.length] });
+      }
     } else {
       // player on blue
       players.push({ team: "blue", isPlayer: true, name: profile.data.name, def: lo.vehicleDef, cosmetics: lo.toVehicleCosmetics(), control: "p1" });
