@@ -15,6 +15,8 @@ export class World {
     this.record = !!config.record;
     this.frames = [];
     this.paused = false;
+    // graphics quality flags (from src/core/quality.js)
+    this.quality = config.quality || { particles: 1, shadows: true, lighting: true, postFX: true };
 
     this.ball = new Ball(this.arena);
 
@@ -236,11 +238,14 @@ export class World {
   }
 
   _spawnTrail(x, y, dx, dy, color) {
-    if (this.particles.length > 480) return;
+    const cap = this.particles.length + Math.ceil(1 * this.quality.particles);
+    if (this.particles.length > 480 || cap > 480) return;
+    if (Math.random() > this.quality.particles) return;
     this.particles.push({ x, y, vx: dx * 60 + (Math.random() * 40 - 20), vy: dy * 60 + (Math.random() * 40 - 20), life: 0.35, maxLife: 0.35, color, size: 6 + Math.random() * 4, gravity: false });
   }
   _spawnBurst(x, y, color, n, speed) {
-    for (let i = 0; i < n; i++) {
+    const scaledN = Math.max(1, Math.round(n * this.quality.particles));
+    for (let i = 0; i < scaledN; i++) {
       if (this.particles.length > 480) break;
       const a = Math.random() * Math.PI * 2;
       const s = speed * (0.4 + Math.random() * 0.6);
@@ -297,6 +302,18 @@ export class World {
     }
     ctx.globalAlpha = 1;
 
+    // post-processing (quality-gated): vignette + soft bloom glow
+    if (this.quality.postFX) {
+      ctx.save();
+      ctx.globalCompositeOperation = "source-over";
+      const vg = ctx.createRadialGradient(cw / 2, ch / 2, ch * 0.35, cw / 2, ch / 2, ch * 0.8);
+      vg.addColorStop(0, "rgba(0,0,0,0)");
+      vg.addColorStop(1, "rgba(0,0,0,0.45)");
+      ctx.fillStyle = vg;
+      ctx.fillRect(0, 0, cw, ch);
+      ctx.restore();
+    }
+
     ctx.restore();
   }
 
@@ -308,9 +325,11 @@ export class World {
       sky.addColorStop(0.55, A.bg);
       sky.addColorStop(1, "#02030a");
       ctx.fillStyle = sky; ctx.fillRect(0, 0, cw, ch);
-      const sun = ctx.createRadialGradient(cw * 0.78, ch * 0.22, 4, cw * 0.78, ch * 0.22, ch * 0.4);
-      sun.addColorStop(0, A.crowd); sun.addColorStop(0.4, A.crowd + "66"); sun.addColorStop(1, A.crowd + "00");
-      ctx.fillStyle = sun; ctx.fillRect(0, 0, cw, ch);
+      if (this.quality.lighting) {
+        const sun = ctx.createRadialGradient(cw * 0.78, ch * 0.22, 4, cw * 0.78, ch * 0.22, ch * 0.4);
+        sun.addColorStop(0, A.crowd); sun.addColorStop(0.4, A.crowd + "66"); sun.addColorStop(1, A.crowd + "00");
+        ctx.fillStyle = sun; ctx.fillRect(0, 0, cw, ch);
+      }
       const hz = ctx.createLinearGradient(0, ch * 0.6, 0, ch);
       hz.addColorStop(0, A.bg + "00"); hz.addColorStop(1, A.ambient);
       ctx.fillStyle = hz; ctx.fillRect(0, ch * 0.6, cw, ch * 0.4);
@@ -318,31 +337,37 @@ export class World {
       const sky = ctx.createLinearGradient(0, 0, 0, ch);
       sky.addColorStop(0, "#05050f"); sky.addColorStop(0.7, A.bg); sky.addColorStop(1, A.bgAccent);
       ctx.fillStyle = sky; ctx.fillRect(0, 0, cw, ch);
-      ctx.save(); ctx.globalCompositeOperation = "lighter";
-      for (let i = 0; i < 4; i++) {
-        const bx = cw * (0.18 + i * 0.21);
-        const lg = ctx.createLinearGradient(bx, 0, bx, ch * 0.8);
-        lg.addColorStop(0, A.crowd + "33"); lg.addColorStop(1, A.crowd + "00");
-        ctx.fillStyle = lg;
-        ctx.beginPath();
-        ctx.moveTo(bx - 20, 0); ctx.lineTo(bx + 20, 0); ctx.lineTo(bx + 90, ch * 0.8); ctx.lineTo(bx - 90, ch * 0.8);
-        ctx.closePath(); ctx.fill();
+      if (this.quality.lighting) {
+        ctx.save(); ctx.globalCompositeOperation = "lighter";
+        for (let i = 0; i < 4; i++) {
+          const bx = cw * (0.18 + i * 0.21);
+          const lg = ctx.createLinearGradient(bx, 0, bx, ch * 0.8);
+          lg.addColorStop(0, A.crowd + "33"); lg.addColorStop(1, A.crowd + "00");
+          ctx.fillStyle = lg;
+          ctx.beginPath();
+          ctx.moveTo(bx - 20, 0); ctx.lineTo(bx + 20, 0); ctx.lineTo(bx + 90, ch * 0.8); ctx.lineTo(bx - 90, ch * 0.8);
+          ctx.closePath(); ctx.fill();
+        }
+        ctx.restore();
       }
-      ctx.restore();
     } else if (variant === "garden") {
       const sky = ctx.createLinearGradient(0, 0, 0, ch);
       sky.addColorStop(0, A.bgAccent); sky.addColorStop(0.7, A.bg); sky.addColorStop(1, "#02030a");
       ctx.fillStyle = sky; ctx.fillRect(0, 0, cw, ch);
-      const glow = ctx.createRadialGradient(cw * 0.5, ch * 0.3, 10, cw * 0.5, ch * 0.3, ch * 0.6);
-      glow.addColorStop(0, A.ambient + "55"); glow.addColorStop(1, A.ambient + "00");
-      ctx.fillStyle = glow; ctx.fillRect(0, 0, cw, ch);
+      if (this.quality.lighting) {
+        const glow = ctx.createRadialGradient(cw * 0.5, ch * 0.3, 10, cw * 0.5, ch * 0.3, ch * 0.6);
+        glow.addColorStop(0, A.ambient + "55"); glow.addColorStop(1, A.ambient + "00");
+        ctx.fillStyle = glow; ctx.fillRect(0, 0, cw, ch);
+      }
     } else {
       const sky = ctx.createLinearGradient(0, 0, 0, ch);
       sky.addColorStop(0, A.bgAccent); sky.addColorStop(0.6, A.bg); sky.addColorStop(1, "#02030a");
       ctx.fillStyle = sky; ctx.fillRect(0, 0, cw, ch);
-      const vig = ctx.createRadialGradient(cw / 2, ch * 0.5, ch * 0.2, cw / 2, ch * 0.5, ch * 0.7);
-      vig.addColorStop(0, A.ambient + "33"); vig.addColorStop(1, A.ambient + "00");
-      ctx.fillStyle = vig; ctx.fillRect(0, 0, cw, ch);
+      if (this.quality.lighting) {
+        const vig = ctx.createRadialGradient(cw / 2, ch * 0.5, ch * 0.2, cw / 2, ch * 0.5, ch * 0.7);
+        vig.addColorStop(0, A.ambient + "33"); vig.addColorStop(1, A.ambient + "00");
+        ctx.fillStyle = vig; ctx.fillRect(0, 0, cw, ch);
+      }
     }
   }
 
@@ -504,8 +529,8 @@ export class World {
     const sq = onG ? (1 - 0.16 * Math.max(-1, Math.min(1, fwd)) - 0.05) : 1.05;
     const wheelSq = onG ? (1 + 0.22 * Math.max(-1, Math.min(1, fwd))) : 0.7;
 
-    // ---- ground shadow ----
-    if (onG) {
+    // ---- ground shadow (quality-gated) ----
+    if (this.quality.shadows && onG) {
       ctx.save();
       ctx.globalAlpha = 0.28;
       ctx.fillStyle = "#000";
@@ -513,7 +538,7 @@ export class World {
       ctx.ellipse(0, hh * 1.1, hw * 1.25, hh * 0.45, 0, 0, Math.PI * 2);
       ctx.fill();
       ctx.restore();
-    } else {
+    } else if (this.quality.shadows) {
       // airborne shadow shrinks as it rises
       const air = Math.min(1, (v.y - 60) / 500);
       ctx.save();

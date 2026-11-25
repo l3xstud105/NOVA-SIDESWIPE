@@ -9,6 +9,7 @@ import { getArena, ARENAS } from "../data/arenas.js";
 import { profile } from "../core/profile.js";
 import { audio } from "../core/audio.js";
 import { clamp } from "../core/math.js";
+import { resolveQuality, backingScale, AdaptiveResolution, autoQuality } from "../core/quality.js";
 import { el, clear, toast, banner, hexToRgba } from "../ui/dom.js";
 import { Hud } from "../ui/hud.js";
 
@@ -35,6 +36,9 @@ export class Game {
     this.replayEntry = null;
     this.replayHud = null;
     this.dpr = Math.min(window.devicePixelRatio || 1, 2);
+    this.qualityName = this._resolveQualitySetting();
+    this.quality = resolveQuality(this.qualityName);
+    this.adaptive = new AdaptiveResolution({ base: this.quality.scale, floor: 0.55, targetFps: this.quality.targetFps });
     this._endedHandled = false;
     this._paused = false;
     this._maxOppLead = 0;
@@ -50,12 +54,37 @@ export class Game {
     this.resize();
   }
 
+  // effective backing-resolution scale: preset scale × adaptive multiplier
+  _effectiveDpr() {
+    const base = backingScale(this.qualityName, this.dpr);
+    return base * this.adaptive.multiplier();
+  }
+
   resize() {
     const c = this.canvas;
     const w = c.clientWidth || window.innerWidth;
     const h = c.clientHeight || window.innerHeight;
-    c.width = Math.floor(w * this.dpr);
-    c.height = Math.floor(h * this.dpr);
+    const ed = this._effectiveDpr();
+    c.width = Math.floor(w * ed);
+    c.height = Math.floor(h * ed);
+    this._edpr = ed;
+  }
+
+  // re-resolve quality after a settings change (called from settings screen)
+  // map a settings value (incl. "auto") to a concrete preset name
+  _resolveQualitySetting() {
+    const g = (profile.data.settings && profile.data.settings.graphics) || "high";
+    if (g === "auto") {
+      return autoQuality(window.devicePixelRatio || 1, navigator.hardwareConcurrency || 4);
+    }
+    return g;
+  }
+
+  rebuildQuality() {
+    this.qualityName = this._resolveQualitySetting();
+    this.quality = resolveQuality(this.qualityName);
+    this.adaptive = new AdaptiveResolution({ base: this.quality.scale, floor: 0.55, targetFps: this.quality.targetFps });
+    this.resize();
   }
 
   // -------- showcase (menu background) --------
@@ -66,7 +95,7 @@ export class Game {
       { team: "orange", isPlayer: false, name: "CPU", def: getVehicle("comet"), cosmetics: this._aiCos(0), difficulty: "hard" },
     ];
     // sfx:null keeps the menu ambience silent (music is handled separately)
-    this.world = new World({ mode: "free", arenaId: "neon", players, input: this.input, sfx: null, record: false });
+    this.world = new World({ mode: "free", arenaId: "neon", players, input: this.input, sfx: null, record: false, quality: this.quality });
     this.state = "menu";
   }
   _aiCos(i) {
@@ -130,7 +159,7 @@ export class Game {
       for (let i = 0; i < ocount; i++) players.push({ team: "orange", isPlayer: false, name: "CPU", def: getVehicle(i === 0 ? "wraith" : "comet"), cosmetics: this._aiCos(i), difficulty: opts.difficulty, style: styles[i % styles.length] });
     }
 
-    this.world = new World({ mode, arenaId: opts.arena, players, input: this.input, sfx: audio, record: true });
+    this.world = new World({ mode, arenaId: opts.arena, players, input: this.input, sfx: audio, record: true, quality: this.quality });
     this.state = "match";
     this._endedHandled = false;
     this._paused = false;
@@ -511,15 +540,18 @@ export class Game {
   }
 
   // -------- render --------
-  render() {
+  render(alpha, fd) {
     const ctx = this.ctx;
     const cw = this.canvas.clientWidth || window.innerWidth;
     const chh = this.canvas.clientHeight || window.innerHeight;
+    const ed = this._edpr || this._effectiveDpr();
+    // adaptive resolution: feed frame times to the controller
+    if (fd != null && this.state !== "menu") this.adaptive.push((fd || 1 / 60) * 1000);
     // self-correct canvas backing size (e.g. after the app becomes visible)
-    if (this.canvas.width !== Math.floor(cw * this.dpr) || this.canvas.height !== Math.floor(chh * this.dpr)) {
+    if (this.canvas.width !== Math.floor(cw * ed) || this.canvas.height !== Math.floor(chh * ed)) {
       this.resize();
     }
-    ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    ctx.setTransform(ed, 0, 0, ed, 0, 0);
 
     if (this.state === "replay" && this.replay) {
       this.replay.render(ctx, cw, chh);
@@ -534,9 +566,9 @@ export class Game {
     if (this.preview && this.preview.canvas) {
       const pc = this.preview.canvas;
       const pw = pc.clientWidth || 360, ph = pc.clientHeight || 360;
-      if (pc.width !== pw * this.dpr) { pc.width = pw * this.dpr; pc.height = ph * this.dpr; }
+      if (pc.width !== pw * ed) { pc.width = pw * ed; pc.height = ph * ed; }
       const pctx = pc.getContext("2d");
-      pctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+      pctx.setTransform(ed, 0, 0, ed, 0, 0);
       this._renderPreview(pctx, pw, ph, this.preview.vehicle);
     }
   }

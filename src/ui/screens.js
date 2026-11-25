@@ -4,6 +4,7 @@ import { profile } from "../core/profile.js";
 import { audio } from "../core/audio.js";
 import { AI_PLAYSTYLES } from "../game/ai.js";
 import { Tournament, getCurrentTournament, clearTournament } from "../game/tournament.js";
+import { QUALITY_ORDER, QUALITY_PRESETS, autoQuality } from "../core/quality.js";
 import { ARENAS } from "../data/arenas.js";
 import { VEHICLES } from "../data/vehicles.js";
 import { PAINTS, WHEELS, BOOSTS, BANNERS, TITLES } from "../data/cosmetics.js";
@@ -487,12 +488,14 @@ export function settings(game) {
   content.append(el("div", { class: "section-title", text: "GRAPHICS" }));
   const gField = el("div", { class: "field" });
   const gSeg = el("div", { class: "seg" });
-  for (const q of ["low", "medium", "high", "ultra"]) {
-    gSeg.append(el("button", { class: s.graphics === q ? "is-active" : "", text: q[0].toUpperCase() + q.slice(1), onclick: () => { s.graphics = q; profile.save(); audio.ui(); settingsRebuild(); } }));
+  const opts = ["auto", ...QUALITY_ORDER];
+  for (const q of opts) {
+    const label = q === "auto" ? "Auto" : QUALITY_PRESETS[q].label;
+    gSeg.append(el("button", { class: s.graphics === q ? "is-active" : "", text: label, onclick: () => { s.graphics = q; profile.save(); audio.ui(); if (game.rebuildQuality) game.rebuildQuality(); settingsRebuild(); } }));
   }
   gField.append(gSeg);
   content.append(gField);
-  content.append(el("div", { class: "text-dim", text: "Adjusts particle counts, shadows and resolution scaling for your device." }));
+  content.append(el("div", { class: "text-dim", text: "Presets scale resolution, particles, shadows and lighting. Auto picks the best fit for your device (Potato → Cinematic)." }));
 
   // audio
   content.append(el("div", { class: "section-title", text: "AUDIO" }));
