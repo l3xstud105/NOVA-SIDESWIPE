@@ -6,6 +6,7 @@ import { AI_PLAYSTYLES } from "../game/ai.js";
 import { Tournament, getCurrentTournament, clearTournament } from "../game/tournament.js";
 import { QUALITY_ORDER, QUALITY_PRESETS, autoQuality } from "../core/quality.js";
 import { Multiplayer, WebSocketTransport } from "../core/net.js";
+import { exportAll, importAll, getStats, storageAvailable } from "../core/storage.js";
 import { ARENAS } from "../data/arenas.js";
 import { VEHICLES } from "../data/vehicles.js";
 import { PAINTS, WHEELS, BOOSTS, BANNERS, TITLES } from "../data/cosmetics.js";
@@ -613,6 +614,45 @@ export function settings(game) {
   content.append(el("button", { class: "btn btn--danger btn--sm", text: "Reset all progress", onclick: () => {
     if (confirm("Erase all local progress, cosmetics and settings?")) { profile.reset(); audio.ui(220); toast("Progress reset."); game.router.go("menu"); }
   } }));
+
+  // backup / restore — protect progression across devices / clear-data events
+  const stor = getStats();
+  const backupCard = el("div", { class: "card mt-4" });
+  backupCard.append(el("div", { class: "card__title", text: "Backup & Restore" }));
+  const storLine = storageAvailable()
+    ? "Local storage is active. " + stor.writes + " saves written."
+    : "Local storage unavailable — progress lives in this session only.";
+  backupCard.append(el("div", { class: "card__sub", text: storLine }));
+  content.append(backupCard);
+  const bkRow = el("div", { class: "row mt-3" });
+  bkRow.append(el("button", { class: "btn btn--sm", text: "Backup to file", onclick: () => {
+    try {
+      const blob = exportAll();
+      const url = URL.createObjectURL(new Blob([blob], { type: "application/json" }));
+      const a = el("a", { href: url, download: "nova-sideswipe-backup.json" });
+      document.body.append(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      audio.ui(880); toast("Backup downloaded.", "reward");
+    } catch (e) { toast("Backup failed: " + e.message, "info"); }
+  } }));
+  const fileIn = el("input", { type: "file", accept: ".json,application/json", style: { display: "none" } });
+  fileIn.onchange = () => {
+    const f = fileIn.files && fileIn.files[0];
+    if (!f) return;
+    const r = new FileReader();
+    r.onload = () => {
+      try {
+        const n = importAll(r.result);
+        profile.load(); // re-read profile from storage after import
+        audio.ui(880); toast("Restored " + n + " save(s).", "reward");
+        settingsRebuild();
+      } catch (e) { toast("Restore failed: " + e.message, "info"); }
+    };
+    r.readAsText(f);
+  };
+  bkRow.append(el("button", { class: "btn btn--sm", text: "Restore from file", onclick: () => fileIn.click() }));
+  content.append(bkRow);
+  content.append(fileIn);
 
   function settingsRebuild() { clear(content); settings(game); }
   applyReducedMotion();

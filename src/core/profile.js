@@ -45,6 +45,14 @@ export const profile = {
     return this.data;
   },
   save() { save("profile", this.data); },
+  // re-read the profile from storage (used after a backup restore, to pick
+  // up the imported data without a full page reload).
+  load() {
+    this.data = load("profile", this.data || defaultProfile());
+    this._ensureDaily();
+    this.save();
+    return this.data;
+  },
   reset() { this.data = defaultProfile(); this.save(); },
 
   _ensureDaily() {
