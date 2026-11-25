@@ -465,9 +465,14 @@ export class Game {
     }
 
     profile.addXP(xp);
+    // grant any level-up rewards reached by the XP gain
+    const newRewards = profile.grantLevelRewards();
+    if (newRewards.length) {
+      toast("Level up! Unlocked: " + newRewards.map((r) => r.label).join(", "), "reward");
+    }
     profile.save();
 
-    this._showResults({ win, draw, myScore, oppScore, myTeam, xp, tournament: toNext });
+    this._showResults({ win, draw, myScore, oppScore, myTeam, xp, tournament: toNext, newRewards });
   }
 
   _startTournamentMatch() {
@@ -518,6 +523,9 @@ export class Game {
     panel.append(el("div", { class: "results__verdict " + vclass, text: verdict }));
     panel.append(el("div", { class: "results__score", html: `<span style="color:#2ce3ff">${r.myScore}</span> - <span style="color:#ff9a3c">${r.oppScore}</span>` }));
     if (mvpGoals > 0) panel.append(el("div", { class: "results__mvp", text: "MVP: " + mvpName + " (" + mvpGoals + " goals)" }));
+    if (r.newRewards && r.newRewards.length) {
+      panel.append(el("div", { class: "results__mvp", text: "Unlocked: " + r.newRewards.map((x) => x.label).join(", ") }));
+    }
     const stats = el("div", { class: "results__stats" });
     const mk = (b, s) => el("div", { class: "results__stat" }, [el("b", { text: String(b) }), el("span", { text: s })]);
     stats.append(mk(m.score.blue, "Blue"), mk(m.score.orange, "Orange"), mk("+" + r.xp, "XP Earned"));

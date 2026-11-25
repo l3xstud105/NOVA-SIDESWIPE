@@ -43,6 +43,8 @@ export const ACHIEVEMENTS = [
   { id: "centurion", name: "Centurion", desc: "Reach level 10." },
   { id: "hoops", name: "Swish", desc: "Score in Hoops." },
   { id: "volley", name: "Volley Chef", desc: "Win a Volleyball match." },
+  { id: "tournament_round", name: "Bracket Climber", desc: "Advance a round in a tournament." },
+  { id: "tournament_champion", name: "Champion", desc: "Win a tournament." },
 ];
 
 export const DAILY_CHALLENGES = [
@@ -57,3 +59,45 @@ export const WEEKLY_CHALLENGES = [
   { id: "w_play10", name: "Play 10 matches", reward: 400 },
   { id: "w_2v2", name: "Play 5 matches of 2v2", reward: 450 },
 ];
+
+// Level-up reward track: cosmetics and titles unlocked as you reach levels.
+// Each entry grants an item when the player first reaches the given level.
+export const LEVEL_REWARDS = [
+  { level: 2, category: "paint", id: "cobalt", label: "Deep Cobalt" },
+  { level: 3, category: "paint", id: "mint", label: "Ion Mint" },
+  { level: 4, category: "wheel", id: "sport", label: "Sport Forged" },
+  { level: 5, category: "title", id: "ace", label: "Ace" },
+  { level: 6, category: "paint", id: "crimson", label: "Crimson Tide" },
+  { level: 7, category: "boost", id: "inferno", label: "Inferno" },
+  { level: 8, category: "paint", id: "violet", label: "Hyper Violet" },
+  { level: 9, category: "banner", id: "striker", label: "Striker Banner" },
+  { level: 10, category: "title", id: "veteran", label: "Veteran" },
+  { level: 12, category: "paint", id: "gold", label: "Aurum Gold" },
+  { level: 14, category: "boost", id: "void", label: "Void Surge" },
+  { level: 16, category: "wheel", id: "magma", label: "Magma Hoop" },
+  { level: 18, category: "banner", id: "star", label: "Starborn Banner" },
+  { level: 20, category: "title", id: "legend", label: "Legend" },
+  { level: 22, category: "paint", id: "toxic", label: "Toxic Lime" },
+  { level: 24, category: "boost", id: "toxic", label: "Toxic Spit" },
+  { level: 26, category: "paint", id: "ember", label: "Ember Orange" },
+  { level: 28, category: "wheel", id: "prism", label: "Prism Disc" },
+  { level: 30, category: "paint", id: "chrome", label: "Chrome Prism" },
+  { level: 30, category: "boost", id: "gold", label: "Aurum Flare" },
+];
+
+// all reward levels, sorted, deduped
+export const REWARD_LEVELS = [...new Set(LEVEL_REWARDS.map((r) => r.level))].sort((a, b) => a - b);
+
+// rewards available at a given level (the tier reached by that level)
+export function rewardsAtLevel(level) {
+  return LEVEL_REWARDS.filter((r) => r.level === level);
+}
+
+// highest reward level the player has reached
+export function highestRewardLevelReached(profileData) {
+  const lvl = (profileData && profileData.level != null)
+    ? profileData.level
+    : levelForXP((profileData && profileData.xp) || 0).level;
+  return REWARD_LEVELS.filter((rl) => rl <= lvl).reduce((m, rl) => Math.max(m, rl), 0);
+}
+

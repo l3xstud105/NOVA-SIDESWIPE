@@ -8,7 +8,7 @@ import { QUALITY_ORDER, QUALITY_PRESETS, autoQuality } from "../core/quality.js"
 import { ARENAS } from "../data/arenas.js";
 import { VEHICLES } from "../data/vehicles.js";
 import { PAINTS, WHEELS, BOOSTS, BANNERS, TITLES } from "../data/cosmetics.js";
-import { RANKS, ACHIEVEMENTS, DAILY_CHALLENGES, WEEKLY_CHALLENGES, levelForXP } from "../data/progression.js";
+import { RANKS, ACHIEVEMENTS, DAILY_CHALLENGES, WEEKLY_CHALLENGES, levelForXP, LEVEL_REWARDS, REWARD_LEVELS, rewardsAtLevel } from "../data/progression.js";
 
 const codeLabel = (code) => {
   if (!code) return "—";
@@ -476,6 +476,27 @@ export function profileScreen(game) {
     ag.append(el("div", { class: "card" + (got ? " is-selected" : "") }, [el("div", { class: "card__title", text: (got ? "🏆 " : "🔒 ") + a.name }), el("div", { class: "card__sub", text: a.desc })]));
   }
   content.append(ag);
+
+  // rewards track
+  content.append(el("div", { class: "section-title", text: "REWARDS TRACK" }));
+  const rr = el("div", { class: "grid grid--2" });
+  const granted = profile.getGrantedRewards();
+  const grantedKeys = new Set(granted.map((g) => g.category + ":" + g.id));
+  for (const r of LEVEL_REWARDS) {
+    const got = grantedKeys.has(r.category + ":" + r.id);
+    const reached = r.level <= lvl.level;
+    rr.append(el("div", { class: "card" + (got ? " is-selected" : "") + (!got && !reached ? " is-locked" : "") }, [
+      el("div", { class: "card__title", text: (got ? "✅ " : reached ? "🔓 " : "🔒 ") + r.label }),
+      el("div", { class: "card__sub", text: "Level " + r.level + " · " + r.category }),
+    ]));
+  }
+  content.append(rr);
+  const nr = profile.nextReward();
+  if (nr) {
+    content.append(el("div", { class: "text-dim mt-4", text: "Next tier — Level " + nr.level + ": " + nr.rewards.map((x) => x.label).join(", ") }));
+  } else {
+    content.append(el("div", { class: "text-dim mt-4", text: "All reward tiers unlocked!" }));
+  }
   return { name: "profile", destroy() {} };
 }
 

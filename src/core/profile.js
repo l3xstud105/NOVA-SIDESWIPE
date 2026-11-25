@@ -2,7 +2,7 @@
 import { load, save, loadOr } from "./storage.js";
 import { PAINTS, WHEELS, BOOSTS, BANNERS, TITLES } from "../data/cosmetics.js";
 import { VEHICLES } from "../data/vehicles.js";
-import { rankForMMR, levelForXP } from "../data/progression.js";
+import { rankForMMR, levelForXP, LEVEL_REWARDS, REWARD_LEVELS, rewardsAtLevel } from "../data/progression.js";
 
 function defaultProfile() {
   return {
@@ -26,6 +26,7 @@ function defaultProfile() {
     },
     stats: { matches: 0, wins: 0, losses: 0, draws: 0, goals: 0, shots: 0, saves: 0, aerials: 0, flipResets: 0, playtime: 0 },
     achievements: {},
+    grantedRewards: {},
     challenges: { daily: { date: today(), done: {} }, weekly: { date: week(), done: {} } },
     replays: [],
     presets: [],
@@ -119,6 +120,55 @@ export const profile = {
     for (const [slot, val] of Object.entries(p.equipped)) this.equip(slot, val);
     return true;
   },
+
+  // ---- level-up reward track ----
+  // key = "category:id"; stored in data.grantedRewards
+  _rewardKey(cat, id) { return cat + ":" + id; },
+
+  hasReward(cat, id) {
+    if (!this.data.grantedRewards) this.data.grantedRewards = {};
+    return !!this.data.grantedRewards[this._rewardKey(cat, id)];
+  },
+
+  // grant every reward for all reward levels up to the player's current level
+  // that have not been granted yet. Returns the list of newly granted rewards.
+  grantLevelRewards() {
+    if (!this.data.grantedRewards) this.data.grantedRewards = {};
+    const lvl = this.level.level;
+    const granted = [];
+    for (const rl of REWARD_LEVELS) {
+      if (rl > lvl) break;
+      for (const r of rewardsAtLevel(rl)) {
+        const key = this._rewardKey(r.category, r.id);
+        if (!this.data.grantedRewards[key]) {
+          this.data.grantedRewards[key] = true;
+          // unlock the cosmetic (adds to owned if it's a cosmetic category)
+          if (["paint", "wheel", "boost", "banner", "title", "vehicle"].includes(r.category)) {
+            this.unlock(r.category, r.id);
+          }
+          granted.push({ ...r });
+        }
+      }
+    }
+    if (granted.length) this.save();
+    return granted;
+  },
+
+  // all rewards the player has earned (granted)
+  getGrantedRewards() {
+    if (!this.data.grantedRewards) this.data.grantedRewards = {};
+    return LEVEL_REWARDS.filter((r) => this.data.grantedRewards[this._rewardKey(r.category, r.id)]);
+  },
+
+  // next reward tier (level + label) the player is progressing toward
+  nextReward() {
+    const lvl = this.level.level;
+    const upcoming = REWARD_LEVELS.filter((rl) => rl > lvl);
+    if (!upcoming.length) return null;
+    const nextLevel = upcoming[0];
+    return { level: nextLevel, rewards: rewardsAtLevel(nextLevel) };
+  },
+
 
   // build the cosmetic bundle used by the game
   buildLoadout() {
