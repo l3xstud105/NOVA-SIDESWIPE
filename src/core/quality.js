@@ -84,3 +84,58 @@ export function autoQuality(devicePixelRatio, coresHint) {
   if (cores >= 2) return "low";
   return "potato";
 }
+
+// ---- PowerManager -------------------------------------------------------------
+// Browser performance that respects real device constraints — especially
+// Chromebooks and other low-power / battery devices. Tracks battery level,
+// charging state, thermal pressure and tab visibility, and exposes a single
+// `throttle()` multiplier plus flags that the renderer uses to cut load.
+// Pure logic (no DOM at import); call update() with live signals.
+export class PowerManager {
+  constructor(opts = {}) {
+    this.batteryLevel = opts.batteryLevel != null ? opts.batteryLevel : 1; // 0..1
+    this.charging = !!opts.charging;
+    this.thermal = opts.thermal || "nominal"; // "nominal" | "medium" | "critical"
+    this.visible = opts.visible !== false;
+    this.autoEnabled = opts.autoEnabled !== false;
+    this.manualParticles = null; // user override multiplier (1..), else null
+    this._dirty = true;
+  }
+
+  // snapshot from the Battery API shape (battery.level, battery.charging)
+  update(signal = {}) {
+    if (signal.level != null) this.batteryLevel = Math.max(0, Math.min(1, signal.level));
+    if (signal.charging != null) this.charging = !!signal.charging;
+    if (signal.thermal) this.thermal = signal.thermal;
+    if (signal.visible != null) this.visible = !!signal.visible;
+    this._dirty = true;
+  }
+
+  // are we under power pressure that should reduce load?
+  shouldThrottle() {
+    if (!this.autoEnabled) return false;
+    if (!this.visible) return true; // hidden tab: never burn cycles
+    if (this.thermal === "critical") return true;
+    if (this.thermal === "medium") return true;
+    if (!this.charging && this.batteryLevel < 0.3) return true; // low battery, unplugged
+    return false;
+  }
+
+  // render-load multiplier (0..1). Stronger pressure → lower.
+  throttle() {
+    if (!this.shouldThrottle()) return 1;
+    let m = 0.55;
+    if (this.thermal === "critical") m = 0.35;
+    if (!this.charging && this.batteryLevel < 0.2) m = 0.3;
+    if (!this.visible) m = 0.0; // hidden: render nothing
+    return m;
+  }
+
+  // effective particle multiplier: base preset * throttle, unless overridden
+  particleMul() {
+    if (this.manualParticles != null) return this.manualParticles;
+    return this.throttle();
+  }
+
+  reset() { this._dirty = true; }
+}

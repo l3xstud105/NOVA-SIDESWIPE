@@ -2,7 +2,7 @@
 // Run: node tests/quality.test.mjs   (no browser)
 import {
   QUALITY_PRESETS, QUALITY_ORDER, DEFAULT_QUALITY,
-  resolveQuality, backingScale, AdaptiveResolution, autoQuality,
+  resolveQuality, backingScale, AdaptiveResolution, autoQuality, PowerManager,
 } from "../src/core/quality.js";
 
 let passed = 0, failed = 0;
@@ -79,6 +79,41 @@ check("backingScale floored at 0.5", bs4 === 0.5, "got " + bs4);
 check("autoQuality strong device → cinematic/high", ["cinematic", "high"].includes(autoQuality(3, 8)));
 check("autoQuality mid device → medium", autoQuality(1.5, 4) === "medium");
 check("autoQuality weak device → low/potato", ["low", "potato"].includes(autoQuality(1, 2)));
+
+// 10. PowerManager: power-aware throttling for low-end / Chromebook / battery
+{
+  const pm = new PowerManager({ batteryLevel: 0.8, charging: true, thermal: "nominal", visible: true });
+  check("PowerManager: healthy device does not throttle", pm.shouldThrottle() === false);
+  check("PowerManager: healthy device throttle() is 1", pm.throttle() === 1);
+
+  const lowBat = new PowerManager({ batteryLevel: 0.25, charging: false, thermal: "nominal", visible: true });
+  check("PowerManager: low battery unplugged throttles", lowBat.shouldThrottle() === true);
+  check("PowerManager: low battery throttle is 0.55", lowBat.throttle() === 0.55);
+
+  const veryLow = new PowerManager({ batteryLevel: 0.15, charging: false, thermal: "nominal", visible: true });
+  check("PowerManager: very low battery throttles harder (0.3)", veryLow.throttle() === 0.3);
+
+  const therm = new PowerManager({ batteryLevel: 0.8, charging: true, thermal: "critical", visible: true });
+  check("PowerManager: critical thermal throttles hard", therm.throttle() <= 0.35);
+
+  const hidden = new PowerManager({ batteryLevel: 0.8, charging: true, thermal: "nominal", visible: false });
+  check("PowerManager: hidden tab throttles", hidden.shouldThrottle() === true);
+  check("PowerManager: hidden tab renders nothing (0)", hidden.throttle() === 0);
+
+  const dyn = new PowerManager({ batteryLevel: 0.9, charging: true, visible: true });
+  dyn.update({ level: 0.1, charging: false });
+  check("PowerManager: update() enables throttle on low battery", dyn.shouldThrottle() === true);
+
+  const dyn2 = new PowerManager({ batteryLevel: 0.9, charging: true, visible: true });
+  check("PowerManager: particleMul() 1 when healthy", dyn2.particleMul() === 1);
+  dyn2.update({ level: 0.1, charging: false });
+  check("PowerManager: particleMul() reduced when throttled", dyn2.particleMul() < 0.55);
+  dyn2.manualParticles = 1.0;
+  check("PowerManager: manual particle override wins", dyn2.particleMul() === 1.0);
+
+  const chargingLow = new PowerManager({ batteryLevel: 0.2, charging: true, thermal: "nominal", visible: true });
+  check("PowerManager: low battery while charging does not throttle", chargingLow.shouldThrottle() === false);
+}
 
 console.log("\n" + passed + " passed, " + failed + " failed");
 process.exit(failed ? 1 : 0);

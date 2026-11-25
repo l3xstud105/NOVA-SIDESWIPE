@@ -9,7 +9,7 @@ import { getArena, ARENAS } from "../data/arenas.js";
 import { profile } from "../core/profile.js";
 import { audio } from "../core/audio.js";
 import { clamp } from "../core/math.js";
-import { resolveQuality, backingScale, AdaptiveResolution, autoQuality } from "../core/quality.js";
+import { resolveQuality, backingScale, AdaptiveResolution, autoQuality, PowerManager } from "../core/quality.js";
 import { el, clear, toast, banner, hexToRgba } from "../ui/dom.js";
 import { Hud } from "../ui/hud.js";
 
@@ -39,6 +39,8 @@ export class Game {
     this.qualityName = this._resolveQualitySetting();
     this.quality = resolveQuality(this.qualityName);
     this.adaptive = new AdaptiveResolution({ base: this.quality.scale, floor: 0.55, targetFps: this.quality.targetFps });
+    // power-aware load reduction (Chromebook / battery / thermal / hidden tab)
+    this.power = new PowerManager({ visible: document.visibilityState !== "hidden" });
     this._endedHandled = false;
     this._paused = false;
     this._maxOppLead = 0;
@@ -54,10 +56,32 @@ export class Game {
     this.resize();
   }
 
-  // effective backing-resolution scale: preset scale × adaptive multiplier
+  // effective backing-resolution scale: preset scale × adaptive × power throttle
   _effectiveDpr() {
     const base = backingScale(this.qualityName, this.dpr);
-    return base * this.adaptive.multiplier();
+    return base * this.adaptive.multiplier() * this.power.throttle();
+  }
+
+  // sample live device signals (battery / visibility / thermal) each frame.
+  // All APIs are guarded — unsupported browsers simply keep last state.
+  _updatePower() {
+    const p = this.power;
+    let signal = {};
+    if (typeof document !== "undefined" && document.visibilityState != null) {
+      signal.visible = document.visibilityState !== "hidden";
+    }
+    if (typeof navigator !== "undefined" && navigator.getBattery) {
+      try {
+        const b = navigator.getBattery();
+        signal.level = b.level;
+        signal.charging = b.charging;
+      } catch (e) { /* ignore */ }
+    }
+    if (navigator.deviceHeatLevel != null) {
+      const t = navigator.deviceHeatLevel;
+      signal.thermal = t >= 5 ? "critical" : t >= 3 ? "medium" : "nominal";
+    }
+    p.update(signal);
   }
 
   resize() {
@@ -333,6 +357,7 @@ export class Game {
 
   // -------- update --------
   update(dt) {
+    this._updatePower();
     this.input.beginFrame();
 
     if (this.state === "replay" && this.replay) {
@@ -569,6 +594,16 @@ export class Game {
       this.resize();
     }
     ctx.setTransform(ed, 0, 0, ed, 0, 0);
+
+    // power-aware particle load: reduce world particle density under throttle
+    if (this.world && this.world.quality) {
+      const baseP = this.quality.particles;
+      this.world.quality.particles = Math.max(0, baseP * this.power.particleMul());
+    }
+    // hidden tab: skip all drawing to save battery entirely
+    if (this.power.throttle() === 0) {
+      return;
+    }
 
     if (this.state === "replay" && this.replay) {
       this.replay.render(ctx, cw, chh);
