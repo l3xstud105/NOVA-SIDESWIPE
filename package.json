@@ -1,0 +1,13 @@
+{
+  "name": "nova-sideswipe",
+  "version": "0.2.0",
+  "description": "NOVA SIDESWIPE — a browser-based side-view competitive car soccer game.",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "test": "node tests/physics.test.mjs",
+    "serve": "node tools/serve.js"
+  },
+  "keywords": ["game", "browser", "car-soccer", "canvas", "webgl", "sideswipe"],
+  "license": "MIT"
+}

@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#05060f" />
+  <meta name="description" content="NOVA SIDESWIPE — a browser-based competitive side-view car soccer game. Play instantly, no install." />
+  <title>NOVA SIDESWIPE</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="stylesheet" href="./styles/main.css" />
+  <link rel="icon" href="./assets/favicon.svg" type="image/svg+xml" />
+</head>
+<body>
+  <!-- Loading screen (shown immediately) -->
+  <div id="loader" class="loader">
+    <div class="loader__bg"></div>
+    <div class="loader__logo">
+      <span class="loader__nova">NOVA</span><span class="loader__swipe">SIDESWIPE</span>
+    </div>
+    <div class="loader__bar"><div class="loader__fill" id="loaderFill"></div></div>
+    <div class="loader__status" id="loaderStatus">INITIALIZING SYSTEMS…</div>
+    <div class="loader__tip" id="loaderTip">Tip: Use BOOST in the air to fly. Flip into the ball to smash it.</div>
+  </div>
+
+  <!-- App root: game canvas + DOM UI layered on top -->
+  <div id="app" class="app" hidden>
+    <canvas id="game" class="game-canvas"></canvas>
+
+    <!-- DOM-based menu / HUD overlay -->
+    <div id="ui-root" class="ui-root"></div>
+
+    <!-- Touch controls (mobile) -->
+    <div id="touch-root" class="touch-root" hidden></div>
+
+    <!-- Connection / error banners -->
+    <div id="banner-root" class="banner-root"></div>
+  </div>
+
+  <noscript>
+    <div style="color:#fff;background:#05060f;padding:40px;font-family:sans-serif">
+      NOVA SIDESWIPE requires JavaScript. Please enable it in your browser.
+    </div>
+  </noscript>
+
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>

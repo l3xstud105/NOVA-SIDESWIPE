@@ -1,0 +1,7 @@
+node_modules/
+.DS_Store/
+*.log
+config.deploy.json
+.env
+dist/
+coverage/
