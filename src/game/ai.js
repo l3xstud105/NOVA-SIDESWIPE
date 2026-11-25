@@ -3,9 +3,9 @@
 // Playstyle personality layers on top of difficulty for varied opponents.
 
 const DIFF = {
-  easy:   { react: 0.18, err: 46, boost: 0.35, flip: 0.15, aerial: 0.0,  speed: 0.82 },
-  medium: { react: 0.10, err: 22, boost: 0.7,  flip: 0.45, aerial: 0.4,  speed: 0.95 },
-  hard:   { react: 0.05, err: 8,  boost: 0.95, flip: 0.8,  aerial: 0.85, speed: 1.0  },
+  easy:   { react: 0.18, err: 46, boost: 0.35, flip: 0.15, aerial: 0.0,  speed: 0.82, predict: 0.18 },
+  medium: { react: 0.10, err: 22, boost: 0.7,  flip: 0.45, aerial: 0.4,  speed: 0.95, predict: 0.38 },
+  hard:   { react: 0.05, err: 8,  boost: 0.95, flip: 0.8,  aerial: 0.85, speed: 1.0,  predict: 0.62 },
 };
 
 // Playstyle personalities: multipliers + behaviour flags layered over difficulty.
@@ -38,16 +38,35 @@ export class AICar {
     this._rng = Math.random;
   }
 
+  // predict the ball's future position using its velocity + gravity.
+  // Clamped to the arena so the AI never aims at an impossible point.
+  _predictBall(dt, lookahead, gravity) {
+    const b = this._ballRef;
+    if (!b) return { x: this.v.x, y: this.v.y };
+    const t = Math.max(0, Math.min(1.0, lookahead));
+    const px = b.x + b.vx * t;
+    const py = b.y + b.vy * t - 0.5 * (gravity || 2000) * t * t;
+    const A = this._arenaRef;
+    return {
+      x: Math.max(b.r, Math.min(A.W - b.r, px)),
+      y: Math.max(b.r, Math.min(A.H - b.r, py)),
+    };
+  }
+
   think(dt, world) {
     const v = this.v, ball = world.ball, A = world.arena;
+    this._ballRef = ball; this._arenaRef = A;
     const d = this.diff, ps = this.ps;
     this._reactT -= dt; this._flipCd -= dt; this._jumpCd -= dt;
 
     const dir = this.attackDir;
     const errX = (this._rng() * 2 - 1) * d.err;
-    // ideal contact point: behind the ball, opposite the attack goal
-    let targetX = ball.x - dir * (ball.r + v.hw + 14) + errX;
-    let targetY = ball.y - 4;
+    // predict where the ball will be; harder AI looks further ahead to intercept
+    const pred = this._predictBall(dt, d.predict, world.arena.gravity);
+    const aimX = pred.x, aimY = pred.y;
+    // ideal contact point: behind the predicted ball, opposite the attack goal
+    let targetX = aimX - dir * (ball.r + v.hw + 14) + errX;
+    let targetY = aimY - 4;
 
     const ownGoalX = dir > 0 ? 0 : A.W;
     const ballToOwn = Math.abs(ball.x - ownGoalX);

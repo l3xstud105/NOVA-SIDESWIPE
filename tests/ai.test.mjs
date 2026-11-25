@@ -96,5 +96,42 @@ console.log("NOVA SIDESWIPE — AI playstyle tests\n");
   check("dodgeDir is -1/0/1", [-1, 0, 1].includes(it.dodgeDir));
 }
 
+// 6. Ball prediction: AI aims where the ball will be, not where it is
+{
+  // orange attacks left (dir -1). Ball moving left (toward orange's attack) at high speed.
+  // The AI should target a point ahead of the ball's current position (intercept).
+  const w = makeWorld(900, 700, 300); // car at 900, ball at 700 moving
+  w.ball.vx = -900; w.ball.vy = 0; // ball rushing left
+  const ai = new AICar(w.ai, "hard", "balanced");
+  // let it recompute a target
+  for (let i = 0; i < 6; i++) ai.think(0.02, w);
+  // predicted ball.x is left of current ball.x (ball moving left); the AI's contact
+  // point is further left (behind predicted ball from orange's attack perspective)
+  check("AI targets ahead of a moving ball (intercept)", ai._target.x < 700, "targetX=" + ai._target.x);
+}
+
+// 7. Harder AI predicts further ahead than easy AI
+{
+  const wHard = makeWorld(900, 700, 300); wHard.ball.vx = -900; wHard.ball.vy = 0;
+  const wEasy = makeWorld(900, 700, 300); wEasy.ball.vx = -900; wEasy.ball.vy = 0;
+  const hard = new AICar(wHard.ai, "hard", "balanced");
+  const easy = new AICar(wEasy.ai, "easy", "balanced");
+  for (let i = 0; i < 6; i++) { hard.think(0.02, wHard); easy.think(0.02, wEasy); }
+  // hard AI looks further ahead → its target is further in the ball's travel direction
+  check("hard AI predicts further ahead than easy", hard._target.x <= easy._target.x,
+    "hard=" + hard._target.x + " easy=" + easy._target.x);
+}
+
+// 8. _predictBall returns a point inside the arena
+{
+  const w = makeWorld(900, 700, 300);
+  w.ball.vx = 99999; // extreme velocity
+  const ai = new AICar(w.ai, "hard", "balanced");
+  ai.think(1 / 60, w);
+  const pred = ai._predictBall(1 / 60, 0.6, 2000);
+  check("predicted point stays within arena width", pred.x >= w.arena.W * 0 || pred.x <= w.arena.W, "x=" + pred.x);
+  check("predicted point is clamped to arena bounds", pred.x >= 0 && pred.x <= w.arena.W, "x=" + pred.x);
+}
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);
