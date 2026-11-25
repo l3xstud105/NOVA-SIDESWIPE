@@ -129,12 +129,17 @@ export class Vehicle {
       this.angle = angLerp(this.angle, target, clamp(PHYS.GROUND_TURN_EASE * dt, 0, 1));
       this.angVel = 0;
     } else if (!this.flipping) {
-      // air control: rotate + small horizontal nudge
+      // air control: rotate + horizontal nudge, with boost-steer and a gentle
+      // auto-level assist so aerials stay controllable.
       if (intent.throttle !== 0) {
         this.angVel += intent.throttle * PHYS.AIR_TORQUE * dt;
         this.angVel = clamp(this.angVel, -PHYS.AIR_MAX_ANGVEL, PHYS.AIR_MAX_ANGVEL);
-        this.vx += intent.throttle * PHYS.AERIAL_DRIVE * dt;
+        const steer = this.boostActive ? PHYS.AERIAL_DRIVE_BOOST : PHYS.AERIAL_DRIVE;
+        this.vx += intent.throttle * steer * dt;
       } else {
+        // gentle self-righting toward upright (angle 0) when no air input
+        const upright = -this.angle;
+        this.angVel += upright * PHYS.AIR_AUTO_LEVEL * dt;
         this.angVel *= Math.max(0, 1 - PHYS.AIR_DAMP * dt);
       }
     }
@@ -250,6 +255,24 @@ export class Vehicle {
     const kick = carSpeed * PHYS.BALL_EXTRA_KICK + (this.boostActive ? 120 : 0);
     ball.vx += nx * kick;
     ball.vy += ny * kick;
+
+    // off-center spin: the tangential car velocity at the contact point curves the
+    // ball (slice/hook). Off-center hits (|t| large) impart more spin.
+    const tanX = -ny, tanY = nx; // tangent (perp to contact normal)
+    const vTan = this.vx * tanX + this.vy * tanY; // car velocity along tangent at contact
+    ball.applySpin(vTan * PHYS.BALL_SPIN_KICK * (1 + Math.abs(t)));
+
+    // dribble carry: when the ball is pressed against the car and not flying away,
+    // let the car drag it along for a natural "carry" instead of an instant bounce.
+    const relN = (ball.vx - this.vx) * nx + (ball.vy - this.vy) * ny;
+    if (relN < 240) {
+      const carry = (1 - PHYS.BALL_CARRY_DRAG);
+      ball.vx += (this.vx - ball.vx) * carry;
+      ball.vy += (this.vy - ball.vy) * carry;
+      ball.carryTimer = 0.12;
+    } else {
+      ball.carryTimer = 0;
+    }
 
     // sounds + particles
     const intensity = Math.min(2, Math.abs(vn) / 600 + carSpeed / 1400 + 0.2);

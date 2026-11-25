@@ -21,10 +21,12 @@ export const PHYS = {
   FLIP_RESET_BOOST: 12,        // boost granted by a flip reset
 
   // air control
-  AIR_TORQUE: 26,              // angular acceleration from directional input
-  AIR_MAX_ANGVEL: 13,
-  AIR_DAMP: 2.2,              // angular damping when no air-roll input
+  AIR_TORQUE: 30,              // angular acceleration from directional input
+  AIR_MAX_ANGVEL: 14,
+  AIR_DAMP: 2.0,              // angular damping when no air-roll input
+  AIR_AUTO_LEVEL: 3.2,        // gentle self-righting torque when airborne w/ no input
   AERIAL_DRIVE: 900,          // small horizontal nudge in air
+  AERIAL_DRIVE_BOOST: 1500,   // aerial steer strength while boosting
 
   // boost
   BOOST_ACCEL: 3000,
@@ -39,6 +41,9 @@ export const PHYS = {
   RESTITUTION_WALL: 0.62,     // ball vs wall
   RESTITUTION_GROUND: 0.66,   // ball vs ground
   BALL_EXTRA_KICK: 0.18,      // extra ball speed from car contact speed
+  BALL_MAGNUS: 0.32,          // Magnus coefficient: spin -> lateral curve
+  BALL_CARRY_DRAG: 0.85,      // how strongly a moving car drags a pinned ball (dribble)
+  BALL_SPIN_KICK: 0.0009,     // spin imparted per unit contact offset * car speed
 };
 
 export const BALL_RADIUS = 27;
