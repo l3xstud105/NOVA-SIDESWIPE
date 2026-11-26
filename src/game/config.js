@@ -44,6 +44,10 @@ export const PHYS = {
   BALL_MAGNUS: 0.32,          // Magnus coefficient: spin -> lateral curve
   BALL_CARRY_DRAG: 0.85,      // how strongly a moving car drags a pinned ball (dribble)
   BALL_SPIN_KICK: 0.0009,     // spin imparted per unit contact offset * car speed
+
+  // kickoff: the ball is centered and popped into the air for a contestable
+  // squabble (reference: "the ball bounces up" at kickoff)
+  KICKOFF_POP_VEL: 720,
 };
 
 export const BALL_RADIUS = 27;

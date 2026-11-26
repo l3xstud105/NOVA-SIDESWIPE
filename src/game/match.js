@@ -1,5 +1,6 @@
 // match.js — match state machine, scoring, timers and mode rules
 import { angLerp } from "../core/math.js";
+import { PHYS } from "./config.js";
 
 // Reference match rules (Rocket League Sideswipe): standard competitive
 // matches are 2:00 (120s) and time-based — no target-score cap ends a
@@ -72,6 +73,9 @@ export class Match {
   _kickoff(initial = false) {
     const A = this.arena;
     this.ball.reset(A.W / 2, this.cfg.mode === "hoops" ? A.H * 0.5 : A.H * 0.72);
+    // pop the ball into the air so kickoff is a contestable aerial squabble
+    // (reference: the ball bounces up at kickoff)
+    this.ball.vy = -PHYS.KICKOFF_POP_VEL;
     // assign spawn sides: blue left, orange right
     const blue = this.vehicles.filter((v) => v.team === "blue");
     const orange = this.vehicles.filter((v) => v.team === "orange");

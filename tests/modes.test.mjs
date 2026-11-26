@@ -155,5 +155,15 @@ check("free play is sandbox (no duration)", MODE_INFO["free"].duration === 0 && 
   check("free play does not score", m.score.blue === 0 && m.score.orange === 0);
 }
 
+// 11. kickoff: the ball is centered and popped into the air (reference behavior)
+{
+  const { m } = makeMatch("1v1");
+  m._kickoff();
+  check("kickoff centers the ball", Math.abs(m.ball.x - m.arena.W / 2) < 1, "x=" + m.ball.x);
+  check("kickoff pops the ball upward (airborne)", m.ball.vy < 0, "vy=" + m.ball.vy);
+  for (let i = 0; i < 10; i++) m.ball.update(1 / 60, { gravity: 2000, arena: m.arena }, null);
+  check("kickoff ball rises above the floor", m.ball.y < m.arena.H * 0.72 - 5, "y=" + m.ball.y);
+}
+
 console.log("\n" + passed + " passed, " + failed + " failed");
 process.exit(failed ? 1 : 0);
