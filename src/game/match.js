@@ -1,12 +1,15 @@
 // match.js — match state machine, scoring, timers and mode rules
 import { angLerp } from "../core/math.js";
 
+// Reference match rules (Rocket League Sideswipe): standard competitive
+// matches are 2:00 (120s) and time-based — no target-score cap ends a
+// match early. Tied at time-up → sudden-death (golden-goal) overtime.
 const MODES = {
-  "1v1":      { label: "1v1 Duel",     teamSize: 1, target: 5, duration: 180, mode: "standard" },
-  "2v2":      { label: "2v2 Doubles",  teamSize: 2, target: 5, duration: 180, mode: "standard" },
-  "local2p":  { label: "Local 2P",     teamSize: 1, target: 5, duration: 180, mode: "standard" },
-  "hoops":    { label: "Hoops",        teamSize: 1, target: 7, duration: 240, mode: "hoops" },
-  "volleyball": { label: "Volleyball", teamSize: 1, target: 7, duration: 240, mode: "volleyball" },
+  "1v1":      { label: "1v1 Duel",     teamSize: 1, target: 0, duration: 120, mode: "standard" },
+  "2v2":      { label: "2v2 Doubles",  teamSize: 2, target: 0, duration: 120, mode: "standard" },
+  "local2p":  { label: "Local 2P",     teamSize: 1, target: 0, duration: 120, mode: "standard" },
+  "hoops":    { label: "Hoops",        teamSize: 1, target: 0, duration: 120, mode: "hoops" },
+  "volleyball": { label: "Volleyball", teamSize: 1, target: 0, duration: 120, mode: "volleyball" },
   "free":     { label: "Free Play",    teamSize: 1, target: 0, duration: 0,   mode: "free" },
 };
 
@@ -134,7 +137,10 @@ export class Match {
     else this._standardGoal(sfx);
 
     // end conditions
-    if (this.duration > 0 && this.time <= 0 && !this.overtime) {
+    // (epsilon guards against floating-point residue leaving a tiny positive
+    // time after exactly the match duration, which would otherwise skip time-up)
+    if (this.duration > 0 && this.time <= 0.01 && !this.overtime) {
+      this.time = 0;
       if (this.score.blue !== this.score.orange) this._end();
       else this.overtime = true; // golden goal
     }

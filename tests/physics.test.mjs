@@ -132,6 +132,38 @@ console.log("NOVA SIDESWIPE — physics & rules tests\n");
   check("boost regenerates when idle", v.boost > after, `after=${after.toFixed(1)} now=${v.boost.toFixed(1)}`);
 }
 
+// 12. landing animation-cancel: flip restored on ground, EXCEPT when holding
+// a directional input away from the landing surface (reference behavior)
+{
+  const A = getArena("neon");
+  // Case A: land with no input → flip restored
+  const va = new Vehicle({ id: "a", team: "blue", isPlayer: true, name: "A", vehicleDef: VEHICLES[0], cosmetics: {}, x: A.W / 2, y: 300 });
+  va.canFlip = false; va.flipping = true; va.flipTimer = 0.4;
+  va.vy = 600; // descending
+  const idle = { throttle: 0, jump: false, jumpPressed: false, boost: false, resetPressed: false, pausePressed: false, dodgeDir: 0 };
+  let landedA = false;
+  for (let i = 0; i < 120 && !landedA; i++) { va.controlPhase(1 / 60, idle, { gravity: 2000, arena: A }); if (va.onGround) landedA = true; }
+  check("vehicle lands (case A)", landedA);
+  // flip restore applies on the ground frame after landing
+  for (let i = 0; i < 3; i++) va.controlPhase(1 / 60, idle, { gravity: 2000, arena: A });
+  check("landing with no input restores flip (animation cancel)", va.canFlip === true, "canFlip=" + va.canFlip);
+
+  // Case B: land while holding a directional input → flip NOT restored
+  const vb = new Vehicle({ id: "b", team: "blue", isPlayer: true, name: "B", vehicleDef: VEHICLES[0], cosmetics: {}, x: A.W / 2, y: 300 });
+  vb.canFlip = false; vb.flipping = true; vb.flipTimer = 0.4;
+  vb.vy = 600; // descending
+  const held = { throttle: 1, jump: false, jumpPressed: false, boost: false, resetPressed: false, pausePressed: false, dodgeDir: 0 };
+  let landedB = false;
+  for (let i = 0; i < 120 && !landedB; i++) { vb.controlPhase(1 / 60, held, { gravity: 2000, arena: A }); if (vb.onGround) landedB = true; }
+  check("vehicle lands (case B)", landedB);
+  // holding input keeps the flip preserved across subsequent ground frames
+  for (let i = 0; i < 3; i++) vb.controlPhase(1 / 60, held, { gravity: 2000, arena: A });
+  check("landing while holding input preserves flip (exception)", vb.canFlip === false, "canFlip=" + vb.canFlip);
+  // releasing input on the ground then restores the flip
+  for (let i = 0; i < 3; i++) vb.controlPhase(1 / 60, idle, { gravity: 2000, arena: A });
+  check("releasing input on ground restores flip", vb.canFlip === true, "canFlip=" + vb.canFlip);
+}
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);
 

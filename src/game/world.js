@@ -43,12 +43,15 @@ export class World {
 
     this.match = new Match({ mode: config.mode, arena: this.arena, ball: this.ball, vehicles: this.vehicles });
 
-    // boost pads
+    // boost pads — collect to refill, then respawn after a cooldown
+    // (reference: ~10s). While inactive a pad is dimmed until it returns.
     this.pads = [];
     const padCount = 4;
+    const PAD_RESPAWN = 10;
+    this._padRespawn = PAD_RESPAWN;
     for (let i = 0; i < padCount; i++) {
       const x = this.arena.W * ((i + 1) / (padCount + 1));
-      this.pads.push({ x, y: 30, r: 34, active: true });
+      this.pads.push({ x, y: 30, r: 34, active: true, respawn: 0 });
     }
 
     // camera
@@ -230,10 +233,24 @@ export class World {
 
   _resolvePads() {
     for (const pad of this.pads) {
+      // respawn countdown for inactive pads
+      if (!pad.active) {
+        if (pad.respawn > 0) {
+          pad.respawn -= 1 / 60;
+          if (pad.respawn <= 0) { pad.active = true; pad.respawn = 0; this._spawnBurst(pad.x, pad.y, "#ffd24b", 6, 120); }
+        }
+        continue;
+      }
       for (const v of this.vehicles) {
         const d = Math.hypot(v.x - pad.x, v.y - pad.y);
         if (d < pad.r + v.hh) {
-          if (v.boost < v.maxBoost) { v.boost = v.maxBoost; this._spawnBurst(pad.x, pad.y, "#ffd24b", 10, 160); }
+          if (v.boost < v.maxBoost) {
+            v.boost = v.maxBoost;
+            this._spawnBurst(pad.x, pad.y, "#ffd24b", 10, 160);
+            // collect → deactivate and schedule respawn (reference ~10s)
+            pad.active = false;
+            pad.respawn = this._padRespawn;
+          }
         }
       }
     }
@@ -347,18 +364,20 @@ export class World {
     // arena floor/walls
     this._drawArena(ctx, W2S, s, A);
 
-    // boost pads (pulsing)
+    // boost pads (pulsing; dimmed while in respawn)
     for (const pad of this.pads) {
       const p = W2S(pad.x, pad.y);
       const pulse = 0.8 + Math.sin(this.time * 4 + pad.x * 0.01) * 0.2;
       const pr = pad.r * s * pulse;
+      const on = pad.active;
+      const alpha = on ? 0.9 : 0.18;
       const g = ctx.createRadialGradient(p.x, p.y, 2, p.x, p.y, pr);
-      g.addColorStop(0, "rgba(255,210,75,0.9)");
+      g.addColorStop(0, "rgba(255,210,75," + alpha + ")");
       g.addColorStop(1, "rgba(255,210,75,0)");
       ctx.fillStyle = g;
       ctx.beginPath(); ctx.arc(p.x, p.y, pr, 0, Math.PI * 2); ctx.fill();
       // inner ring
-      ctx.strokeStyle = "rgba(255,210,75,0.5)";
+      ctx.strokeStyle = "rgba(255,210,75," + (on ? 0.5 : 0.2) + ")";
       ctx.lineWidth = 2 * s;
       ctx.beginPath(); ctx.arc(p.x, p.y, pr * 0.6, 0, Math.PI * 2); ctx.stroke();
     }

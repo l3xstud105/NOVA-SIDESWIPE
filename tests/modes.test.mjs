@@ -31,6 +31,24 @@ for (const key of ["1v1", "2v2", "local2p", "hoops", "volleyball", "free"]) {
   check("mode '" + key + "' declared", !!MODE_INFO[key]);
 }
 
+// 1b. reference match rules: 2-minute (120s) time-based matches, no target cap
+for (const key of ["1v1", "2v2", "local2p", "hoops", "volleyball"]) {
+  const info = MODE_INFO[key];
+  check("mode '" + key + "' is 120s (2:00) per reference", info.duration === 120, "duration=" + info.duration);
+  check("mode '" + key + "' is time-based (no target cap)", info.target === 0, "target=" + info.target);
+}
+check("free play is sandbox (no duration)", MODE_INFO["free"].duration === 0 && MODE_INFO["free"].target === 0);
+
+// 1c. match runs full duration then goes to sudden-death overtime on a tie
+{
+  const { m } = makeMatch("1v1");
+  m.countdown = 0; m.state = "playing";
+  // advance exactly the 120s duration with a tied score
+  for (let i = 0; i < 120 * 60; i++) m.update(1 / 60, { gravity: 2000, arena: m.arena }, null);
+  check("match reaches time-up after 120s", m.time <= 0);
+  check("tied match enters overtime (golden goal), not ended", m.overtime === true && m.state !== "ended", "state=" + m.state + " ov=" + m.overtime);
+}
+
 // 2. hoops: 2-point shot scored near the hoop
 {
   const { ball, m } = makeMatch("hoops");

@@ -103,6 +103,10 @@ export class Vehicle {
 
     // ----- GROUND VS AIR CONTROL -----
     if (this.onGround && !this.flipping) {
+      // animation-cancel: on the ground, restore flip control — but only when
+      // the player is NOT holding a directional input away from the surface.
+      // Holding a direction preserves the flip (reference exception).
+      if (!intent.throttle && !intent.dodgeDir) this.canFlip = true;
       const n = this.groundNormal;
       const tangent = { x: n.y, y: -n.x }; // surface tangent, +x-ish
       const dir = intent.throttle;
@@ -175,9 +179,11 @@ export class Vehicle {
     // ----- WORLD CONTACT -----
     this._resolveWorld(env.arena);
 
-    // contact-start event → allow flips again
+    // contact-start event → end any active flip duration. The flip itself is
+    // restored by the animation-cancel below, EXCEPT when the player holds a
+    // directional input away from the landing surface (reference behavior:
+    // auto-correct does not force the flip back in that case).
     if (this.onGround && !wasGround) {
-      this.canFlip = true;
       this.flipping = false;
     }
   }

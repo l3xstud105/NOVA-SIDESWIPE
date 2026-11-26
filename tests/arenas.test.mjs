@@ -85,5 +85,30 @@ check("arenas have varied effects", unique.size >= 4, "unique=" + unique.size);
   check("none-effect arena seeds no ambient", w.ambient.length === 0, "n=" + w.ambient.length);
 }
 
+// boost pads: collect to refill, then respawn after a cooldown (~10s)
+{
+  const A = getArena("neon");
+  const w = new World({ mode: "free", arenaId: "neon", players: [{ team: "blue", isPlayer: true, name: "T", def: VEHICLES[0], cosmetics: {}, control: "p1" }], input: { get: () => ({}), getIntent: () => ({ throttle: 0, jump: false, jumpPressed: false, boost: false, resetPressed: false, pausePressed: false, dodgeDir: 0 }) }, sfx: null, record: false, quality: { particles: 1, shadows: true, lighting: true, postFX: true } });
+  const v = w.vehicles[0];
+  const pad = w.pads[0];
+  w.match.countdown = 0; w.match.state = "playing"; // skip countdown so pads resolve
+  check("all boost pads start active", w.pads.every((p) => p.active === true));
+
+  // place the vehicle on the pad with empty boost so collection triggers
+  v.x = pad.x; v.y = pad.y + 4; v.boost = 0; v.onGround = true;
+  w.update(1 / 60);
+  check("collecting a pad refills boost", v.boost >= v.maxBoost - 1, "boost=" + v.boost);
+  check("collecting a pad deactivates it", pad.active === false, "active=" + pad.active);
+
+  // an inactive pad does not refill
+  v.boost = 0;
+  w.update(1 / 60);
+  check("inactive pad does not refill boost", v.boost < v.maxBoost, "boost=" + v.boost);
+
+  // advance ~10s (600 fixed steps) → pad respawns and reactivates
+  for (let i = 0; i < 600; i++) w.update(1 / 60);
+  check("pad respawns after ~10s cooldown", pad.active === true, "active=" + pad.active);
+}
+
 console.log("\n" + passed + " passed, " + failed + " failed");
 process.exit(failed ? 1 : 0);
