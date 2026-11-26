@@ -164,6 +164,27 @@ console.log("NOVA SIDESWIPE — physics & rules tests\n");
   check("releasing input on ground restores flip", vb.canFlip === true, "canFlip=" + vb.canFlip);
 }
 
+// 13. wall driving: the car sticks to and drives along a vertical wall
+// (reference: "you can also drive up and down walls")
+{
+  const A = getArena("neon");
+  const v = new Vehicle({ id: "w", team: "blue", isPlayer: true, name: "W", vehicleDef: VEHICLES[0], cosmetics: {}, x: 48, y: 300 });
+  const ball = new Ball(A); ball.x = A.W - 10; ball.y = 5;
+  const env = { gravity: 2000, arena: A };
+  const drive = { throttle: -1, jump: false, jumpPressed: false, boost: false, resetPressed: false, pausePressed: false, dodgeDir: 0 };
+  let contactFrames = 0;
+  for (let i = 0; i < 120; i++) {
+    v.controlPhase(1 / 60, drive, env);
+    ball.update(1 / 60, env, null);
+    v.collideBall(ball, env);
+    // on the left wall => surface normal points +x (into the arena)
+    if (v.groundNormal.x > 0.7) contactFrames++;
+  }
+  check("car drives along the wall staying in contact", contactFrames >= 90, "contactFrames=" + contactFrames);
+  check("car does not detach from the wall (x clamped)", v.x < 60, "x=" + v.x.toFixed(1));
+  check("car moves along the wall surface (y changes)", Math.abs(v.y - 300) > 20, "y=" + v.y.toFixed(1));
+}
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);
 

@@ -6,6 +6,8 @@ export const PHYS = {
   DRIVE_ACCEL: 2600,
   MAX_DRIVE_SPEED: 1320,
   GROUND_FRICTION: 6.5,        // velocity damping per second when no throttle
+  WALL_STICK: 42,              // strong adhesion on walls/ceiling so the car
+                              // holds position instead of sliding off (reference)
   GROUND_TURN_EASE: 16,        // how fast car aligns to ground normal
 
   // jumping

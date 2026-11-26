@@ -121,9 +121,13 @@ export class Vehicle {
         if (tv > cap) { this.vx -= tangent.x * (tv - cap); this.vy -= tangent.y * (tv - cap); }
         if (tv < -cap) { this.vx -= tangent.x * (tv + cap); this.vy -= tangent.y * (tv + cap); }
       } else {
-        // friction along tangent
+        // friction along tangent. Floors use normal friction; walls and the
+        // ceiling use strong adhesion so the car holds position instead of
+        // sliding off under gravity (reference: cars drive on walls/ceiling).
         const tv = this.vx * tangent.x + this.vy * tangent.y;
-        const f = Math.max(0, 1 - PHYS.GROUND_FRICTION * dt);
+        const isFloor = n.y > 0.9;
+        const rate = isFloor ? PHYS.GROUND_FRICTION : PHYS.WALL_STICK;
+        const f = Math.max(0, 1 - rate * dt);
         const newTv = tv * f;
         this.vx += tangent.x * (newTv - tv);
         this.vy += tangent.y * (newTv - tv);
