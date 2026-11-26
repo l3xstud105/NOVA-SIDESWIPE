@@ -112,5 +112,54 @@ console.log("NOVA SIDESWIPE — enhanced ball physics tests\n");
   check("kick() sets ball velocity", ball.vx === 400 && ball.vy === -300);
 }
 
+// 9. Hit-type consistency: direct vs glancing vs moving vs aerial
+// A direct, centered hit sends the ball along the contact normal with little spin.
+{
+  const v = new Vehicle({ id: "d", team: "blue", isPlayer: true, name: "D", vehicleDef: VEHICLES[0], cosmetics: {}, x: A.W / 2, y: 400 });
+  v.onGround = true; v.vx = 800; v.vy = 0; v.angle = 0;
+  const ball = new Ball(A);
+  ball.x = v.x + v.hw + ball.r - 6; ball.y = v.y; // overlapping, centered contact
+  v.collideBall(ball, env);
+  check("direct hit sends ball along contact normal (+x)", ball.vx > 400, "vx=" + ball.vx.toFixed(1));
+  check("direct hit imparts little spin", Math.abs(ball.spin) < 20, "spin=" + ball.spin.toFixed(2));
+}
+
+// A glancing (off-center) hit imparts more spin than a centered hit.
+{
+  const v = new Vehicle({ id: "g", team: "blue", isPlayer: true, name: "G", vehicleDef: VEHICLES[0], cosmetics: {}, x: A.W / 2, y: 400 });
+  v.onGround = true; v.vx = 800; v.vy = 0; v.angle = 0;
+  const ball = new Ball(A);
+  // contact the top of the car (off-center) -> tangential velocity imparts spin
+  ball.x = v.x + v.hw * 0.4; ball.y = v.y - v.hh - ball.r + 4;
+  v.collideBall(ball, env);
+  check("glancing hit imparts spin", Math.abs(ball.spin) > 0, "spin=" + ball.spin.toFixed(2));
+}
+
+// A moving (fast car) hit transfers more speed to the ball than a slow hit.
+{
+  const makeHit = (carVx) => {
+    const v = new Vehicle({ id: "m", team: "blue", isPlayer: true, name: "M", vehicleDef: VEHICLES[0], cosmetics: {}, x: A.W / 2, y: 400 });
+    v.onGround = true; v.vx = carVx; v.vy = 0; v.angle = 0;
+    const ball = new Ball(A);
+    ball.x = v.x + v.hw + ball.r - 6; ball.y = v.y;
+    v.collideBall(ball, env);
+    return ball.vx;
+  };
+  const slow = makeHit(200);
+  const fast = makeHit(1200);
+  check("faster car hit sends ball faster", fast > slow, "slow=" + slow.toFixed(1) + " fast=" + fast.toFixed(1));
+}
+
+// An aerial hit (car airborne) still collides and kicks the ball.
+{
+  const v = new Vehicle({ id: "a", team: "blue", isPlayer: true, name: "A", vehicleDef: VEHICLES[0], cosmetics: {}, x: A.W / 2, y: 300 });
+  v.onGround = false; v.vx = 600; v.vy = 0; v.angle = 0;
+  const ball = new Ball(A);
+  ball.x = v.x + v.hw + ball.r - 6; ball.y = v.y;
+  const touched = v.collideBall(ball, env);
+  check("aerial car-ball collision occurs", touched === true);
+  check("aerial hit kicks the ball", Math.abs(ball.vx) > 300, "vx=" + ball.vx.toFixed(1));
+}
+
 console.log("\n" + passed + " passed, " + failed + " failed");
 process.exit(failed ? 1 : 0);
